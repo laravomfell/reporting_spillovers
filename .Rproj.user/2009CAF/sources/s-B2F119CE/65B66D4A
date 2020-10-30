@@ -1,0 +1,24 @@
+{
+    "id": "65B66D4A",
+    "path": "D:/Research/hawkes/run.R",
+    "project_path": "run.R",
+    "type": "r_source",
+    "hash": "1395622896",
+    "contents": "",
+    "dirty": true,
+    "created": 1604050950720.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "cursorPosition": "356,0",
+        "scrollLine": "337"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1604054709,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1604054709674,
+    "read_only": false,
+    "read_only_alternatives": []
+}
