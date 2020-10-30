@@ -1,8 +1,19 @@
+I've reworked some parts of the code, turned all the sweave files into vanilla .R files
+
+I also added the files sent to me by Jiancang Zhuang. To get the 'inpoly' function to work you need to do run 'R CMD SHLIB poly.f' on the command line once. All the filepaths have already been modified by me to work
+
+
+
+
+
+
+
+
 A semiparametric spatiotemporal Hawkes-type point process model with periodic background for crime data
 J. Zhuang and J. Mateu
 J. R. Statist. Soc. A, 182 (2019), 919 -- 942
 
- Data 
+Data 
 The data are in the files
 
 salida_puntos_llamada.csv: boundary of Castallon city center 
