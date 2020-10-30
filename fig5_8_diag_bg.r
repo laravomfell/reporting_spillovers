@@ -1,5 +1,5 @@
 
-source('~/Share/Mylib/Rsrc/inpoly.r')
+source('inpoly.r')
 
 poly.downtown <- read.table('castellon-city-center.polygon.dat')/1000
 

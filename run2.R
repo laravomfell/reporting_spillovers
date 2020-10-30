@@ -1,6 +1,3 @@
-
-<< >>=
-
 if(!file.exists("Excite.Spatail.Marks")){system("mkdir Excite.Spatail.Marks")}
 
 for(i in 1:nrow(a)){
@@ -12,41 +9,35 @@ for(i in 1:nrow(a)){
          save(excite.spatial.mark.temp, file=fn)
      }
 }
-@ 
 
-Since the size of matrix \texttt{excite.spatial.mark.temp} is 
-$2001\times 2001$, it is difficult to store them in one array with a size of
-$2001\times 2001 \times 5087=20,368,353,087$. Thus we put them into files and read them with function \texttt{Vm} when neccessary.
-<<>>=
+
+#Since the size of matrix \texttt{excite.spatial.mark.temp} is 
+#$2001\times 2001$, it is difficult to store them in one array with a size of
+#$2001\times 2001 \times 5087=20,368,353,087$. Thus we put them into files and read them with function \texttt{Vm} when neccessary.
 Vm <- function(fn){
   load(paste("Excite.Spatail.Marks/",fn,sep=""))
   excite.spatial.mark.temp
 }
-@ 
 
-\begin{figure}
-<<fig=TRUE>>=
-kk <- as.integer(runif(1, 1, nrow(a)+1))
- plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
-      excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.x),20)], col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)]+2, pch=".", main=paste(kk, "Coverage"),cex=4, xlab="X", ylab="Y")
 
-@ 
-<<>>=
- plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
-      col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))+2, 
-      pch=".", main=kk)
-@ 
-\end{figure}
+# \begin{figure}
+# kk <- as.integer(runif(1, 1, nrow(a)+1))
+ # plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
+      # excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.x),20)], col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)]+2, pch=".", main=paste(kk, "Coverage"),cex=4, xlab="X", ylab="Y")
 
-Now, we go into the iteration steps. First, to reconstruct all the component functions. 
+ # plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
+      # col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))+2, 
+      # pch=".", main=kk)
 
-(a) Contruct daily peridicity.
-<<eval=TRUE>>=
+# \end{figure}
+
+# Now, we go into the iteration steps. First, to reconstruct all the component functions. 
+
+#(a) Contruct daily peridicity.
+
    lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
    bgprobs <- mu * bgrates.at.events.no.mu / lambda.at.events
 
-@ 
-<<eval=TRUE,fig=TRUE>>=
 
 ### 2-1. smoothing daily 
 print("### 2-1. smoothing daily ")
@@ -67,10 +58,8 @@ daily.basevalue <- daily.basevalue/ mean(daily.basevalue)
 
 plot(daily.base, daily.basevalue,type="l")
 
-@ 
-(b) Construct weekly
-<<eval=TRUE,fig=TRUE>>=
 
+#(b) Construct weekly
 print("### 2-2. smoothing weekly")
 
 wghs.weekly <-  weekly.fun(a$days)*background.spatial.fun(a$coorx, a$coory)/lambda.at.events
@@ -89,9 +78,8 @@ weekly.basevalue <- weekly.basevalue/mean(weekly.basevalue)
 
 plot(weekly.base, weekly.basevalue, type="l")
 
-@ 
-(c) Construct trend
-<<eval=TRUE,fig=TRUE>>=
+
+# (c) Construct trend
 
 print("### 2-3. smoothing  trend")
 wghs.trend <- trend.fun(a$days)/lambda.at.events
@@ -106,11 +94,7 @@ trend.basevalue <- trend.basevalue/mean(trend.basevalue)
 
 plot(time.marks, trend.basevalue, type="l")
 
-@ 
-
-(d) Smoothing background
-
-<<>>=
+# (d) Smoothing background
 
 # wghs.background <- bgprobs
 
@@ -142,10 +126,8 @@ for(i in 1:nrow(a)){
  
 ### Standardize the background so its average is 1
    background.basevalue <-  background.basevalue/mean(background.basevalue[background.marks>=0])
-@
 
-(e) Construct temporal excitations.
-<<eval=TRUE,fig=TRUE>>=
+# (e) Construct temporal excitations.
 
 
 excite.temporal.base <- seq(0, 15, 0.005)    
@@ -205,8 +187,7 @@ excite.temporal.basevalue <- excite.temporal.basevalue/simpson(excite.temporal.b
 plot(excite.temporal.series$mids, excite.temporal.series$density, pch=".",cex=2,col=2)
 points(excite.temporal.base, excite.temporal.basevalue,type="l", lwd=2)
 
-save.image('crime-excite-P2.RData')
-@ 
-<<fig=TRUE>>=
+# save.image('crime-excite-P2.RData')
+
 filled.contour(excite.spatial.base.x[seq(1,2001,20)], excite.spatial.base.y[seq(1,2001,20)], spatial.repetance[seq(1,2001,20),seq(1,2001,20)])
-@ 
+

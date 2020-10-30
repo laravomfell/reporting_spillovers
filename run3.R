@@ -1,7 +1,5 @@
-(f) Construct spatial component of excitations. Remember 
-\texttt{excite.spatial.base.x}, \texttt{excite.spatial.base.y}, and \texttt{excite.spatial.basevalue}.
-
-<<>>=
+#(f) Construct spatial component of excitations. Remember 
+#\texttt{excite.spatial.base.x}, \texttt{excite.spatial.base.y}, and \texttt{excite.spatial.basevalue}.
 
 dis.mat <- cbind(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]], 
                  a$coory[ij.mat[,1]] - a$coory[ij.mat[,2]])
@@ -25,4 +23,3 @@ excite.spatial.basevalue <- excite.spatial.basevalue/simpson.2D(excite.spatial.b
 
 filled.contour(excite.spatial.base.x[seq(1,2001,20)], excite.spatial.base.y[seq(1,2001,20)],
                excite.spatial.basevalue[seq(1,2001,20),seq(1,2001,20)], main='Kernel somoothed')
-@ 

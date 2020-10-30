@@ -1,7 +1,5 @@
 
-Now we can make the loop. 
-
-<< >>=
+# Now we can make the loop. 
 
 #mu <- 0.0002
 #A=0.5
@@ -334,4 +332,4 @@ filled.contour(temp$x.mids,  temp$y.mids,temp$density, main="Rough hist")
      save.image(file=paste('Loop-',OuterLoop, ".image", sep=""))
      
 }
-@ 
+

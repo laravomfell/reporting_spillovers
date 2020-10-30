@@ -4,10 +4,12 @@ library(polyCub)
 library(spatstat) # must run R with option "--max-ppsize=100000"
 gpclibPermit()
 
-setwd("H:/settings/desktop/A1429Zhuang")
 # functions
 dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
+source("utils.R")
 
+
+# THIS CAN BE SKIPPED IF type1_crime_datatable already exists
 
 # # Read Crime data
 # crimes <-read.csv(file="salida_puntos_llamada.csv",head=TRUE,sep=",")
@@ -46,15 +48,17 @@ dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 #    } 
 # }
 # 
-# # Read boundary
-# city.boundary <- read.csv(file="castallon_city_boundary.csv")
-# city.boundary <- list(x=city.boundary$X, y= city.boundary$Y)
-# 
-# city.boundary$x= city.boundary$x /1000
-# city.boundary$y= city.boundary$y /1000
-# 
-# city.boundary$x <- rev(city.boundary$x)
-# city.boundary$y <- rev(city.boundary$y)
+
+# BOUNDARY of CASTELLON
+# Read boundary
+city.boundary <- read.csv(file="castallon_city_boundary.csv")
+city.boundary <- list(x=city.boundary$X, y= city.boundary$Y)
+
+city.boundary$x= city.boundary$x /1000
+city.boundary$y= city.boundary$y /1000
+
+city.boundary$x <- rev(city.boundary$x)
+city.boundary$y <- rev(city.boundary$y)
 # 
 # a$bg.integral <- rep(0, nrow(a))
 # 
@@ -71,7 +75,7 @@ dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 # 
 # write.table(a, file="type1_crime_data.table")
 
-
+# read data
 a <- read.table("type1_crime_data.table")
 
 # time stamps used (from where??)
@@ -80,6 +84,7 @@ time.marks <- seq(0, 730,0.005)
 # TT = length of the time interval
 TT <- 730
 
+# range of coordinates
 Xrange <- c(749.440, 754.264)
 Yrange <- c(4428.644, 4432.570)
 
@@ -164,10 +169,10 @@ background.basevalue <- matrix(0, nrow=length(background.base$x),
 background.basex <- background.base$x %o% rep(1, length(background.base$y))
 background.basey <- rep(1, length(background.base$x))%o% background.base$y
 
-# ???
+# for each location, check if it's outside the boundary (-1), on the boundary (0) or inside (1)
 background.marks <- matrix(inpoly( background.basex ,   
             background.basey, 
-            city.boundary), ncol=length(background.base$y))
+            city.boundary$x, city.boundary$y), ncol=length(background.base$y))
   
 if(!file.exists("Background.Smoothers"))system("mkdir Background.Smoothers")
 
@@ -195,10 +200,8 @@ for(i in 1:nrow(a)){
 ### Standardize the background so its average is 1
    background.basevalue <-  background.basevalue/mean(background.basevalue[background.marks>=0])
 
-@
-The background rate is then $\mu(t, x, y) = \mu_0\, \mu_{\mathrm{trend}}(t)\mu_{\mathrm{spatial}}(x,y)\,\mu_{\mathrm{daily}}(t)\,\mu_{\mathrm{weekly}}(t) $. 
-(4) temporal and spatial components of triggering function.
-<< eval=TRUE>>=
+# The background rate is then $\mu(t, x, y) = \mu_0\, \mu_{\mathrm{trend}}(t)\mu_{\mathrm{spatial}}(x,y)\,\mu_{\mathrm{daily}}(t)\,\mu_{\mathrm{weekly}}(t) $. 
+#(4) temporal and spatial components of triggering function.
 
 print('#### Intitial step ##### ### 4.  Setting up triggering ')
 
@@ -219,10 +222,7 @@ print('#### Intitial step ##### ### 4.  Setting up triggering ')
 
  plot(seq(0, 15, 0.005), excite.temporal.basevalue,type="l")
 
-
-@ 
-Now we can evaluate the lambda function 
-<<eval=TRUE>>=
+# now we can evaluate the lambda function 
 ################ Evaluated lambda #########################
 print('############ Intitial step ########## Evaluating lambda #########################')
 
@@ -312,60 +312,56 @@ print('############ Intitial step ########## Evaluating lambda #################
  }
    
  print(c(triggers.at.events.no.A[1:10], triggers.at.all.no.A))
-@ 
-
-Update $\mu$ and $A$ for the first time. Since the likelihood function takes the form
-\begin{equation}
-  \log L = \sum_{i=1}^n \log \lambda(t_i,x_i,y_i) -\int_0^T\iint_S \lambda(t,x,y)\,\dd x\dd y\,\dd t
- \end{equation}
-where
-\begin{equation}
-  \lambda(t)=\mu_0\mu(t,x,y) + A \sum_{i:\,t_i <t} g(t_i-t, x_i-x, y_i-y).
-  \end{equation}
-Denote $U= \int_0^T\iint_S \mu(t,x,y)\,\dd x\dd y\,\dd t$ and $G=\int_0^T\iint_S  \sum_{i:\,t_i <t} g(t-t_i, x-x_i, y-y_i)\,\dd x\dd y\,\dd t $, which are represented by \texttt{bgrates.at.all.no.mu} and \texttt{triggers.at.all.no.A}. Then the equations $\frac{\partial}{\partial \mu_0} \log L=0$ and $\frac{\partial}{\partial A} \log L=0$ 
-can be written as
-\begin{eqnarray}
-  \sum_{i=1}^n \frac{\mu(t_i,x_i,y_i)}{\lambda(t_i,x_i,y_i)} - U &=&0 \\
-  \sum_{i=1}^n \frac{\sum_{j:t_j<t_i} g(t_j-t_i,x_j-x_i,y_j-y_i)}{\lambda(t_i,x_i,y_i)} - G &=&0 \label{eq:logl.2}
- \end{eqnarray}
-(\ref{eq:logl.2}) can be rewritten as 
-\begin{eqnarray}
- \frac{1}{A}\sum_{i=1}^n \left[1- \frac{\mu_0 \mu(t_i,x_i,y_i)}{\lambda(t_i,x_i,y_i)} \right]- G &=&0 
- \end{eqnarray}
-The above equations can be solve by the following iteration:
-\begin{eqnarray}
-  A^{(k+1)}&=& \frac{n-\sum_{i=1}^n \varphi_i^{(k)}}{G}\\
-  \mu_0^{(k+1)}&=& \frac{n-A^{(k+1)} G}{U}
-  \end{eqnarray}
-where $\varphi_i^{(k)} =\frac{\mu_0^{(k)}\mu(t_i,x_i,y_i)}{\mu_0^{(k)}\mu(t_i,x_i,y_i) + A^{(k)} \sum_{j:\,t_j <t_i} g(t_j-t_i, x_j-x_i, y_j-y_i)}$, represented by \texttt{bgprobs} in the program. 
-<<eval=TRUE>>=
-
-   A = 0.5
-   mu = 0.7
-
-   NegLogLikehood <- function(x){
-     mu <- x[1]^2
-     A = x[2]^2
-       
-    lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
-    lambda.at.all <-  mu* bgrates.at.all.no.mu + A * triggers.at.all.no.A
-      
-    - sum(log(lambda.at.events)) + lambda.at.all
-   }
-    
-   res.optim <- optim(par=sqrt(c(A, mu)), NegLogLikehood, control=list(trace=6))
-   mu <- res.optim $par[1]^2
-   A <- res.optim $par[2]^2
-
-   print(paste("mu=",mu, "A=", A, "at Loop", 0))
 
 
-   lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
-   lambda.at.all <-  mu* bgrates.at.all.no.mu + A * triggers.at.all.no.A
+#Update $\mu$ and $A$ for the first time. Since the likelihood function takes the form
+# \begin{equation}
+#   \log L = \sum_{i=1}^n \log \lambda(t_i,x_i,y_i) -\int_0^T\iint_S \lambda(t,x,y)\,\dd x\dd y\,\dd t
+#  \end{equation}
+# where
+# \begin{equation}
+#   \lambda(t)=\mu_0\mu(t,x,y) + A \sum_{i:\,t_i <t} g(t_i-t, x_i-x, y_i-y).
+#   \end{equation}
+# Denote $U= \int_0^T\iint_S \mu(t,x,y)\,\dd x\dd y\,\dd t$ and $G=\int_0^T\iint_S  \sum_{i:\,t_i <t} g(t-t_i, x-x_i, y-y_i)\,\dd x\dd y\,\dd t $, which are represented by \texttt{bgrates.at.all.no.mu} and \texttt{triggers.at.all.no.A}. Then the equations $\frac{\partial}{\partial \mu_0} \log L=0$ and $\frac{\partial}{\partial A} \log L=0$ 
+# can be written as
+# \begin{eqnarray}
+#   \sum_{i=1}^n \frac{\mu(t_i,x_i,y_i)}{\lambda(t_i,x_i,y_i)} - U &=&0 \\
+#   \sum_{i=1}^n \frac{\sum_{j:t_j<t_i} g(t_j-t_i,x_j-x_i,y_j-y_i)}{\lambda(t_i,x_i,y_i)} - G &=&0 \label{eq:logl.2}
+#  \end{eqnarray}
+# (\ref{eq:logl.2}) can be rewritten as 
+# \begin{eqnarray}
+#  \frac{1}{A}\sum_{i=1}^n \left[1- \frac{\mu_0 \mu(t_i,x_i,y_i)}{\lambda(t_i,x_i,y_i)} \right]- G &=&0 
+#  \end{eqnarray}
+# The above equations can be solve by the following iteration:
+# \begin{eqnarray}
+#   A^{(k+1)}&=& \frac{n-\sum_{i=1}^n \varphi_i^{(k)}}{G}\\
+#   \mu_0^{(k+1)}&=& \frac{n-A^{(k+1)} G}{U}
+#   \end{eqnarray}
+# where $\varphi_i^{(k)} =\frac{\mu_0^{(k)}\mu(t_i,x_i,y_i)}{\mu_0^{(k)}\mu(t_i,x_i,y_i) + A^{(k)} \sum_{j:\,t_j <t_i} g(t_j-t_i, x_j-x_i, y_j-y_i)}$, represented by \texttt{bgprobs} in the program. 
+A = 0.5
+mu = 0.7
 
-   bgprobs <- mu * bgrates.at.events.no.mu / lambda.at.events
+NegLogLikehood <- function(x){
+ mu <- x[1]^2
+ A = x[2]^2
+   
+lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
+lambda.at.all <-  mu* bgrates.at.all.no.mu + A * triggers.at.all.no.A
   
-save.image('crime-excite-P1.RData')
+- sum(log(lambda.at.events)) + lambda.at.all
+}
 
-@
+res.optim <- optim(par=sqrt(c(A, mu)), NegLogLikehood, control=list(trace=6))
+mu <- res.optim $par[1]^2
+A <- res.optim $par[2]^2
+
+print(paste("mu=",mu, "A=", A, "at Loop", 0))
+
+
+lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
+lambda.at.all <-  mu* bgrates.at.all.no.mu + A * triggers.at.all.no.A
+
+bgprobs <- mu * bgrates.at.events.no.mu / lambda.at.events
+  
+#save.image('crime-excite-P1.RData')
 
