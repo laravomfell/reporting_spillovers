@@ -1,9 +1,8 @@
-First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
+# First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
 
-Let us introduce function \texttt{hist.weighted.2D} and \texttt{ker.smooth.2D.fft}.
+# Let us introduce function \texttt{hist.weighted.2D} and \texttt{ker.smooth.2D.fft}.
  
-<<>>=
-source('~/Share/Mylib/Rsrc/inpoly.r')
+source('inpoly.r')
 library(fields)
 
 simpson <- function(value, dx=1)
@@ -145,6 +144,3 @@ ker.smooth.2D.fft<- function(x, y, z, x.bandwidth,y.bandwidth)
   Re(smoothed[1:(nx+1), 1:(ny+1)])
     
 }
-
-
-@
