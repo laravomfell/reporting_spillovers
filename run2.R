@@ -1,72 +1,53 @@
+# set up matrix of cross between x and y
+excite.spatial.basex <- excite.spatial.base.x %o% rep(1, length(excite.spatial.base.y))
+excite.spatial.basey <- t(excite.spatial.base.y %o% rep(1, length(excite.spatial.base.x)))
+
 if(!file.exists("Excite.Spatail.Marks")){system("mkdir Excite.Spatail.Marks")}
 
 for(i in 1:nrow(a)){
-     fn <- paste("Excite.Spatail.Marks/crime1-",substr(10000+i,2,5),".mark",sep="")
+     fn <- paste0("Excite.Spatail.Marks/crime1-", substr(10000 + i, 2, 5), ".mark")
+     
      if(!file.exists(fn)){
          print(i)
-         excite.spatial.mark.temp <- matrix((inpoly(excite.spatial.basex +a$coorx[i], excite.spatial.basey + a$coory[i], city.boundary$x, city.boundary$y) >=0),
-         ncol=length(excite.spatial.base.x))
+         excite.spatial.mark.temp <- matrix((inpoly(excite.spatial.basex + a$coorx[i], 
+                                                    excite.spatial.basey + a$coory[i], 
+                                                    city.boundary$x, 
+                                                    city.boundary$y) >=0),
+                                            ncol=length(excite.spatial.base.x))
          save(excite.spatial.mark.temp, file=fn)
      }
 }
 
 
 #Since the size of matrix \texttt{excite.spatial.mark.temp} is 
-#$2001\times 2001$, it is difficult to store them in one array with a size of
-#$2001\times 2001 \times 5087=20,368,353,087$. Thus we put them into files and read them with function \texttt{Vm} when neccessary.
+#$2001\times 2001$, it is difficult to store them in one array
+# Thus we put them into files and read them with function \texttt{Vm} when neccessary.
 Vm <- function(fn){
-  load(paste("Excite.Spatail.Marks/",fn,sep=""))
+  load(paste0("Excite.Spatail.Marks/", fn))
   excite.spatial.mark.temp
 }
 
 
-# \begin{figure}
-# kk <- as.integer(runif(1, 1, nrow(a)+1))
- # plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
-      # excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.x),20)], col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)]+2, pch=".", main=paste(kk, "Coverage"),cex=4, xlab="X", ylab="Y")
+# Now, we reconstruct all the component functions. 
 
- # plot(excite.spatial.basex[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], excite.spatial.basey[seq(1, length(excite.spatial.base.x), 20), seq(1, length(excite.spatial.base.y), 20)], 
-      # col=Vm(paste("crime1-",substr(kk+10000,2,5), ".mark",sep=""))+2, 
-      # pch=".", main=kk)
+# (a) Construct daily periodicity
 
-# \end{figure}
-
-# Now, we go into the iteration steps. First, to reconstruct all the component functions. 
-
-#(a) Contruct daily peridicity.
-
-   lambda.at.events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
-   bgprobs <- mu * bgrates.at.events.no.mu / lambda.at.events
-
-
-### 2-1. smoothing daily 
-print("### 2-1. smoothing daily ")
-
-wghs.daily <- daily.fun(a$days)*background.spatial.fun(a$coorx, a$coory)/lambda.at.events
-
+wghs.daily <- daily.fun(a$days) * background.spatial.fun(a$coorx, a$coory)/lambda.at.events
 
 new.marks <- a$days - as.integer(a$days)
 
-
-temp <- hist.weighted (new.marks, wghs.daily, breaks= daily.base)
-
+temp <- hist.weighted(new.marks, wghs.daily, breaks = daily.base)
 
 daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.03)
  
 daily.basevalue <- daily.basevalue/ mean(daily.basevalue)
 
-
-plot(daily.base, daily.basevalue,type="l")
-
-
 #(b) Construct weekly
-print("### 2-2. smoothing weekly")
 
 wghs.weekly <-  weekly.fun(a$days)*background.spatial.fun(a$coorx, a$coory)/lambda.at.events
 
 new.marks <- a$days - as.integer(a$days/7)*7 
 weights <- 1/ (as.integer(TT/7) + (a$days - as.integer(a$days/7)*7 > TT - as.integer(TT/7)*7)) 
-
 
 temp <- hist.weighted(new.marks, weights*wghs.weekly, breaks=weekly.base)
 
@@ -74,32 +55,24 @@ weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.5)
 
 weekly.basevalue <- weekly.basevalue/mean(weekly.basevalue)
 
-
-
-plot(weekly.base, weekly.basevalue, type="l")
-
-
 # (c) Construct trend
 
-print("### 2-3. smoothing  trend")
 wghs.trend <- trend.fun(a$days)/lambda.at.events
 
 trend.basevalue <- rep(0, length(time.marks))
 
 for(i in 1:nrow(a)){
-    trend.basevalue <- (trend.basevalue + wghs.trend[i]*dnorm(a$days[i]-time.marks, 0, 100)/(pnorm(TT, a$days[i], 100)-pnorm(0, a$days[i],  100)))    
+    trend.basevalue <- (trend.basevalue + wghs.trend[i] * dnorm(a$days[i]-time.marks, 0, 100)/
+                          (pnorm(TT, a$days[i], 100) - pnorm(0, a$days[i],  100)))    
 }
 
 trend.basevalue <- trend.basevalue/mean(trend.basevalue)
 
-plot(time.marks, trend.basevalue, type="l")
-
 # (d) Smoothing background
 
-# wghs.background <- bgprobs
-
-background.basevalue <- matrix(0, nrow=length(background.base$x), 
-   ncol=length(background.base$y))
+background.basevalue <- matrix(0, 
+                               nrow=length(background.base$x), 
+                               ncol=length(background.base$y))
 
 if(!file.exists("Background.Smoothers"))system("mkdir Background.Smoothers")
 
@@ -115,79 +88,83 @@ for(i in 1:nrow(a)){
     } else{
         load(fn)
     }   
-   background.basevalue <- background.basevalue + bgprobs[i]*bgsmoother
-    
-  if(i/500 ==as.integer(i/500)| i == nrow(a)){# print(i)
-   filled.contour(background.base$x[seq(1, length(background.base$x), 18)],background.base$y[seq(1, length(background.base$y), 18)],
-     (log10(background.basevalue*(background.marks>=0)/730/
-               polyarea(city.boundary$x, city.boundary$y)))[seq(1, length(background.base$x), 18),seq(1, length(background.base$y), 18)], main=i)
-  }
+   background.basevalue <- background.basevalue + bgprobs[i] * bgsmoother
 }
  
-### Standardize the background so its average is 1
-   background.basevalue <-  background.basevalue/mean(background.basevalue[background.marks>=0])
+# Standardize the background so its average is 1 inside study area
+background.basevalue <- background.basevalue/mean(background.basevalue[background.marks>=0])
 
-# (e) Construct temporal excitations.
-
+# (e) Construct temporal excitation
 
 excite.temporal.base <- seq(0, 15, 0.005)    
 excite.spatial.basex <- excite.spatial.base.x %o% rep(1, length(excite.spatial.base.y))
 excite.spatial.basey<- rep(1, length(excite.spatial.base.x)) %o% excite.spatial.base.y
 
-
-temporal.repetance <- 0 * excite.temporal.base
-spatial.repetance <- matrix(0, ncol=length(excite.spatial.base.x),
+temporal.repetance <- rep(0, length(excite.temporal.base))
+spatial.repetance <- matrix(0, 
+                            ncol=length(excite.spatial.base.x),
                             nrow=length(excite.spatial.base.y))  
 
 excite.temporal.edge.correction <- rep(0, nrow(a))
 excite.spatial.edge.correction <- rep(0, nrow(a))
 
+# repetance = "repetition corrections, i.e. for how many times the triggering effect at time lag t or the
+# spatial offset (x, y) is observed"
 for(i in 1:nrow(a)){
-#     print(i)
-    excite.temporal.edge.correction[i] <-sum(excite.temporal.fun(seq(0, TT-a$days[i], 0.005)+0.6e-5))*.005
+    excite.temporal.edge.correction[i] <- sum(excite.temporal.fun(seq(0, TT - a$days[i], 0.005)+0.6e-5)) * 0.005
        
-    temporal.repetance [excite.temporal.base < TT -a$days[i]] <- temporal.repetance [excite.temporal.base < TT -a$days[i]]+1  
+    # count up how often ??
+    temporal.repetance[excite.temporal.base < TT -a$days[i]] <- temporal.repetance [excite.temporal.base < TT -a$days[i]]+1  
     
    
     temp <- Vm(paste("crime1-",substr(i+10000,2,5), ".mark", sep=""))
-         
+    
     spatial.repetance <- spatial.repetance + temp
           
-    excite.spatial.edge.correction [i] <- simpson.2D(temp*excite.spatial.basevalue, 0.002, 0.002)
-               
+    excite.spatial.edge.correction[i] <- simpson.2D(temp*excite.spatial.basevalue, 0.002, 0.002)
 }
 
 
-temporal.repetance.fun <- approxfun(excite.temporal.base, temporal.repetance, 
-                                 yleft=1, yright=1)
+temporal.repetance.fun <- approxfun(excite.temporal.base, 
+                                    temporal.repetance,
+                                    yleft=1, yright=1)
 
 spatial.repetance.fun <- function(x,y){
-    temp <- interp.surface(obj=list(x=excite.spatial.base.x, y=excite.spatial.base.y, z= spatial.repetance), loc=cbind(x=c(x), y=c(y)))
-    temp[is.na(temp)]<-0
+    temp <- interp.surface(obj=list(x = excite.spatial.base.x, 
+                                    y = excite.spatial.base.y, 
+                                    z = spatial.repetance), 
+                           loc=cbind(x=c(x), y=c(y)))
+    temp[is.na(temp)] <- 0
     temp
 }
     
-    
-   temp.mat <- (1:nrow(a))%o% rep(1, nrow(a))
-   ij.mat <- cbind(c(t(temp.mat)), c(temp.mat))
-   ij.mat <- ij.mat[a$days[ij.mat[,1]] > a$days[ij.mat[,2]] &a$days[ij.mat[,1]] <= a$days[ij.mat[,2]]+15.0 & abs(a$coorx[ij.mat[,1]] -a$coorx[ij.mat[,2]]) <=2
-                 & abs(a$coory[ij.mat[,1]] -a$coory[ij.mat[,2]]) <=2,]                                                          
-   excite.wghs <- (A*excite.temporal.fun(a$days[ij.mat[,1]]-a$days[ij.mat[,2]])
-     *excite.spatial.fun(a$coorx[ij.mat[,1]]-a$coorx[ij.mat[,2]],a$coory[ij.mat[,1]]-a$coory [ij.mat[,2]])/ lambda.at.events[ij.mat[,1]])
-   
-   excite.temporal.series <- hist.weighted(a$days[ij.mat[,1]]-a$days[ij.mat[,2]],
-                                           excite.wghs/(excite.spatial.edge.correction[ij.mat[,2]]
-                                           *temporal.repetance.fun(a$days[ij.mat[,1]]-a$days[ij.mat[,2]])), 
-                                           breaks=excite.temporal.base)
+# create a matrix ij.mat where 
+# [, i] is the i index
+# [, j] lists all events j where j < i
+# and (i,j) are no more than 2km and 15 days apart
+temp.mat <- (1:nrow(a)) %o% rep(1, nrow(a))
 
-excite.temporal.basevalue<- ker.smooth.conv(excite.temporal.series$mids, excite.temporal.series$density, bandwidth=0.05)
+ij.mat <- cbind(c(t(temp.mat)), c(temp.mat))
+
+ij.mat <- ij.mat[a$days[ij.mat[,1]] > a$days[ij.mat[,2]] & 
+                 a$days[ij.mat[,1]] <= a$days[ij.mat[,2]] + 15.0 & 
+                 abs(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]]) <=2 & 
+                 abs(a$coory[ij.mat[,1]] -a$coory[ij.mat[,2]]) <=2,]
+
+# evaluate triggering function
+excite.wghs <- (A * excite.temporal.fun(a$days[ij.mat[,1]] - a$days[ij.mat[,2]]) *
+                excite.spatial.fun(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]],
+                                   a$coory[ij.mat[,1]]- a$coory [ij.mat[,2]]) / 
+                lambda.at.events[ij.mat[,1]])
+   
+excite.temporal.series <- hist.weighted(a$days[ij.mat[,1]] - a$days[ij.mat[,2]],
+                                        excite.wghs/
+                                        (excite.spatial.edge.correction[ij.mat[,2]] * 
+                                         temporal.repetance.fun(a$days[ij.mat[,1]] - a$days[ij.mat[,2]])), 
+                                        breaks = excite.temporal.base)
+
+excite.temporal.basevalue <- ker.smooth.conv(excite.temporal.series$mids, 
+                                             excite.temporal.series$density, 
+                                             bandwidth=0.05)
 
 excite.temporal.basevalue <- excite.temporal.basevalue/simpson(excite.temporal.basevalue, 0.005) 
-
-plot(excite.temporal.series$mids, excite.temporal.series$density, pch=".",cex=2,col=2)
-points(excite.temporal.base, excite.temporal.basevalue,type="l", lwd=2)
-
-# save.image('crime-excite-P2.RData')
-
-filled.contour(excite.spatial.base.x[seq(1,2001,20)], excite.spatial.base.y[seq(1,2001,20)], spatial.repetance[seq(1,2001,20),seq(1,2001,20)])
-
