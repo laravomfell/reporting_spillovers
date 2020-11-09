@@ -11,6 +11,7 @@ excite.spatial.series <- hist.weighted.2D(dis.mat[,1],
                                           x.breaks= excite.spatial.base.x, 
                                           y.breaks= excite.spatial.base.y)
 
+# what is 2.35?
 excite.spatial.mark2 <- (excite.spatial.basex^2 + excite.spatial.basey^2 < 2.35^2)
 
 temp <- spatial.repetance.fun(excite.spatial.series$x.mids %o% rep(1, length(excite.spatial.series$y.mids)),

@@ -38,7 +38,7 @@ new.marks <- a$days - as.integer(a$days)
 
 temp <- hist.weighted(new.marks, wghs.daily, breaks = daily.base)
 
-daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.03)
+daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_daily)
  
 daily.basevalue <- daily.basevalue/ mean(daily.basevalue)
 
@@ -51,7 +51,7 @@ weights <- 1/ (as.integer(TT/7) + (a$days - as.integer(a$days/7)*7 > TT - as.int
 
 temp <- hist.weighted(new.marks, weights*wghs.weekly, breaks=weekly.base)
 
-weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.5)
+weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
 
 weekly.basevalue <- weekly.basevalue/mean(weekly.basevalue)
 
@@ -62,7 +62,7 @@ wghs.trend <- trend.fun(a$days)/lambda.at.events
 trend.basevalue <- rep(0, length(time.marks))
 
 for(i in 1:nrow(a)){
-    trend.basevalue <- (trend.basevalue + wghs.trend[i] * dnorm(a$days[i]-time.marks, 0, 100)/
+    trend.basevalue <- (trend.basevalue + wghs.trend[i] * dnorm(a$days[i] - time.marks, 0, 100)/
                           (pnorm(TT, a$days[i], 100) - pnorm(0, a$days[i],  100)))    
 }
 

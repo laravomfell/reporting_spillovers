@@ -1,3 +1,5 @@
+# In this file we only set up the initial values for mu_t, mu_d, mu_w, mu_bg, f, g, mu0 and A
+
 library(foreach)
 library(doParallel)
 library(polyCub)
@@ -5,7 +7,6 @@ library(spatstat) # must run R with option "--max-ppsize=100000"
 gpclibPermit()
 
 # functions
-dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 source("utils.R")
 
 # read data (from source("prepare_data.R"))
@@ -32,6 +33,15 @@ time.marks <- seq(0, TT, 1/(TT/3.65))
 Xrange <- c(749.440, 754.264)
 Yrange <- c(4428.644, 4432.570)
 
+# SET UP KERNEL BW
+# from paper
+bw_daily <- 0.03
+bw_weekly <- 0.5
+
+# maximum trigger ranges allowed
+max_t <- 15 # days
+max_d <- 2 # km
+
 # ------------------
 # SETUP BASEVALUES
 # ------------------
@@ -48,7 +58,7 @@ new.marks <- a$days - as.integer(a$days)
 temp <- hist.weighted(new.marks, rep(1, nrow(a)), breaks = daily.base)
 
 # smooth points from midpoints density with bw 0.03
-daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.03)
+daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_daily)
 
 # standardize
 daily.basevalue <- daily.basevalue/ mean(daily.basevalue)
@@ -68,7 +78,7 @@ weights <- 1 / (as.integer(TT/7) + (a$days - as.integer(a$days / 7) * 7 > TT - a
 temp <- hist.weighted(new.marks, weights, breaks = weekly.base)
 
 # smooth density
-weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.5)
+weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
 # standardize
 weekly.basevalue <- weekly.basevalue / mean(weekly.basevalue)
 
@@ -76,7 +86,7 @@ weekly.basevalue <- weekly.basevalue / mean(weekly.basevalue)
 # 3. smoothing all trend
 
 # split time interval into 3.65 days
-trend.base <- seq(0, 730,0.005)
+trend.base <- seq(0, 730, 0.005)
 
 trend.basevalue <- rep(0, length(time.marks))
 
@@ -87,7 +97,7 @@ for(i in 1:nrow(a)){
                       /(pnorm(TT, a$days[i], 100) - pnorm(0, a$days[i], 100)))    
 }
 
-# standarize
+# standardize
 trend.basevalue <- trend.basevalue / mean(trend.basevalue)
 
 
@@ -151,19 +161,18 @@ background.basevalue <- background.basevalue / mean(background.basevalue[backgro
 
 # Temporal triggering
 
-# where do these numbers come from?
-# maybe 15 is the highest value at which we still expect an effect? (day 15)
-# but what is the rest?
+# these are just some initial values where we hardcode that we don't 
+# expect any effect after more than 15 days
 excite.temporal.basevalue <- (0.05 + seq(0, 15, 0.005)/10)^(-1.03)
 
 # we normalize by the integral over the entire time window
 excite.temporal.basevalue <- excite.temporal.basevalue / simpson(excite.temporal.basevalue, 0.005)
-# okay this is decay in time.
-plot(seq(0, 15, 0.005), excite.temporal.basevalue,type="l")
+
+
 
 # spatial triggering
 
-# Again, no idea where these number are coming from.
+# again, we hardcode that there is no effect more than 2km away
 excite.spatial.base.x <- seq(-2, 2, 0.002)
 excite.spatial.base.y <- seq(-2, 2, 0.002)
 d <- length(excite.spatial.base.x)
@@ -204,12 +213,12 @@ background.spatial.fun <- function(x,y) (interp.surface(obj=list(x=background.ba
                                                                  z=background.basevalue),
                                                         loc=cbind(x=c(x), y=c(y))))
 
-# what is this?
+# initial guess for g(t)
 excite.temporal.fun <- approxfun(seq(0, 15, 0.005)+0.6e-12, 
                                  excite.temporal.basevalue, 
                                  yleft=0, yright=0)
 
-# interpolate spatial trigger component
+# interpolate spatial trigger component (initial guess for h(s))
 excite.spatial.fun <- function(x,y){
   temp <- interp.surface(obj=list(x=excite.spatial.base.x, 
                                   y=excite.spatial.base.y, 

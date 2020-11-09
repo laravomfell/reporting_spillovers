@@ -14,8 +14,8 @@ for(OuterLoop in 1:40){
   wghs.daily <- daily.fun(a$days)*background.spatial.fun(a$coorx, a$coory)/lambda.at.events
   
   new.marks <- a$days - as.integer(a$days)
-  temp <- hist.weighted (new.marks, wghs.daily, breaks= daily.base)
-  daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.03)
+  temp <- hist.weighted(new.marks, wghs.daily, breaks = daily.base)
+  daily.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_daily)
 
   daily.basevalue <- daily.basevalue/ mean(daily.basevalue)
 
@@ -30,7 +30,7 @@ for(OuterLoop in 1:40){
 
   temp <- hist.weighted(new.marks, weights*wghs.weekly, breaks=weekly.base)
 
-  weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, 0.5)
+  weekly.basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
 
   weekly.basevalue <- weekly.basevalue/mean(weekly.basevalue)
 
@@ -43,7 +43,7 @@ for(OuterLoop in 1:40){
   for(i in 1:nrow(a)){
     # where is the 50 coming from? wasn't it 100 before?
     trend.basevalue <- (trend.basevalue + wghs.trend[i] * dnorm(a$days[i] - time.marks, 0, 50)/
-                          (pnorm(TT, a$days[i], 50) - pnorm(0, a$days[i],  50)))    
+                          (pnorm(TT, a$days[i], 50) - pnorm(0, a$days[i], 50)))    
   }
 
   trend.basevalue <- trend.basevalue/mean(trend.basevalue)
@@ -100,23 +100,6 @@ for(OuterLoop in 1:40){
   # Reconstructing exciting component
   for(loop2 in 1:5){
 
-    # HM THIS DOESN't ACTUALY APPEAR TP BE USED
-    excite.temporal.edge.correction <- rep(0, nrow(a))
-  
-    excite.spatial.edge.correction <- rep(0, nrow(a))
-
-    for(i in 1:nrow(a)){
-    excite.temporal.edge.correction[i] <-sum(excite.temporal.fun(seq(0, TT-a$days[i], 0.005)+0.6e-5))*.005
-     
-    # hang on. this is wrong no?
-    # i think this should be i
-    temp <- Vm(paste("crime1-",substr(kk+10000,2,5), ".mark", sep=""))
-        
-    excite.spatial.edge.correction[i] <- simpson.2D(temp*excite.spatial.basevalue, 0.002, 0.002)
-             
-    }
-
-  
     excite.wghs <- (A * excite.temporal.fun(a$days[ij.mat[,1]] - a$days[ij.mat[,2]]) *
                       excite.spatial.fun(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]],
                                          a$coory[ij.mat[,1]]- a$coory [ij.mat[,2]]) / 
@@ -152,7 +135,7 @@ for(OuterLoop in 1:40){
 
 
 
-    # Re-estimate A #########
+    # Re-estimate A #
 
     excite.temporal.fun <- approxfun(seq(0, 15, 0.005)+0.6e-12, 
                                      excite.temporal.basevalue, 
