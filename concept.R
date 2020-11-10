@@ -58,10 +58,23 @@
 
 library(spatstat) # must run R with option "--max-ppsize=100000"
 library(purrr)
+library(Matrix)
+
+
+library(foreach)
+library(doParallel)
+library(tictoc)
+
+no_cores <- 2
+cl <- makeCluster(no_cores)
+registerDoParallel(cl)
+
 
 # functions
 source("utils.R")
 
+#tic("one complete run")
+tic("begin setup")
 # read data (from source("prepare_data.R"))
 a <- read.table("type1_crime_data.table")
 # BOUNDARY of CASTELLON
@@ -106,7 +119,7 @@ space_units <- 0.002
 # init mu_d
 # 1. smoothing daily 
 
-# daily.base is splitting the day into roughly 6min chunks
+# daily_base is splitting the day into roughly 6min chunks
 daily_base <- seq(0, 1, time_units)
 
 # calculate how far into the day each event happened. unit: 1/days
@@ -164,48 +177,58 @@ background_basex <- background_base$x %o% rep(1, length(background_base$y))
 background_basey <- rep(1, length(background_base$x))%o% background_base$y
 
 # for each location, check if it's outside the boundary (-1), on the boundary (0) or inside (1)
-background_marks <- matrix(inpoly(background_basex,   
+# I've simplified this to (inside = 1, outside = 0) since no point lies on the
+# boundary anyway
+background_marks <- Matrix(inpoly(background_basex,   
                                   background_basey, 
                                   city.boundary$x, 
-                                  city.boundary$y), 
-                           ncol = length(background_base$y))
+                                  city.boundary$y) >= 0, 
+                           ncol = length(background_base$y),
+                           sparse = TRUE)
 
-# predefine empty matrix
-background_basevalue <- matrix(0, 
-                               nrow = length(background_base$x), 
-                               ncol = length(background_base$y))
+# since the initialization of background_basevalue is slow, 
+# check if I've already pre-calculated it
 
-if(!file.exists("Background.Smoothers")){
-  system("mkdir Background.Smoothers")
-}
-
-# for each location on the grid, add density of each event
-for(i in 1:nrow(a)){
+if (!file.exists("setup_background_basevalue.mtx")){
+  # predefine empty matrix
+  background_basevalue <- matrix(0, 
+                                 nrow = length(background_base$x), 
+                                 ncol = length(background_base$y))
   
-  fn <- paste0("Background.Smoothers/", "bgsmoother-", i, ".val")
-  
-  if(!file.exists(fn)){
-    
-    bgsmoother <- (
-      dnorm(background_basex, 
-            a$coorx[i],
-            a$bandwidth[i]) * 
-        dnorm(background_basey,
-              a$coory[i], 
-              a$bandwidth[i]) /
-        a$bg.integral[i]
-    )
-    save(bgsmoother,file=fn)
-  } else{
-    load(fn)
+  if(!file.exists("background_smoothers")){
+    system("mkdir background_smoothers")
   }
   
-  background_basevalue <- background_basevalue + bgsmoother
+  # for each location on the grid, add density of each event
+  for(i in 1:nrow(a)){
+    
+    fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
+    
+    if(!file.exists(fn)){
+      
+      bgsmoother <- Matrix(
+        dnorm(background_basex, 
+              a$coorx[i],
+              a$bandwidth[i]) * 
+          dnorm(background_basey,
+                a$coory[i], 
+                a$bandwidth[i]) /
+          a$bg.integral[i],
+        sparse = TRUE)
+      writeMM(bgsmoother, file = fn)
+    } else{
+      bgsmoother <- readMM(fn)
+    }
+    
+    background_basevalue <- background_basevalue + bgsmoother
+  }
+  
+  # standardize the background so its average inside the study window is 1
+  background_basevalue <- background_basevalue / mean(background_basevalue[background_marks > 0])
+  writeMM(background_basevalue, file = "setup_background_basevalue.mtx")
+} else {
+  background_basevalue <- readMM("setup_background_basevalue.mtx")
 }
-
-# standardize the background so its average inside the study window is 1
-background_basevalue <- background_basevalue / mean(background_basevalue[background_marks >= 0])
-
 
 
 # init g(t)
@@ -250,41 +273,36 @@ bg_at_events_no_mu <- (trend_fun(a$days) *
 # mean of background over entire space
 bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
                          weekly_fun(time_marks) * 
-                         daily_fun(time_marks)) * 
+                           daily_fun(time_marks)) * 
                     TT *
                     mean(background_fun(background_basex,
                                         background_basey) * 
                          background_marks) *
                     ra)
 
-# trigger prob rho
-rho_at_events_no_A <- map(1:nrow(a), 
-                          function(i) g_fun(a$days - a$days[i]) * 
-                                      h_fun(a$coorx - a$coorx[i], 
-                                            a$coory - a$coory[i]))
+# trigger prob rho 
+# calculating using foreach
+rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
 rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
 
-# this loop takes approx 3h because we need to evaluate 
+# this loop takes approx 1.5h because we need to evaluate 
 # h_fun repeatedly over the entire grid
 bg_weight <- sum(background_marks > 0)/length(background_marks)
 
-# get mean effect of g_fun over the entire time
+# get mean effect of g_fun and h_fun over the entire time and space
 # multiply through with all constants
-rho_at_all_no_A <- map(a$days, function(x) mean(g_fun(time_marks - x)) * TT * ra)
-
-for (i in 1:nrow(a)){
-  if (i %% 100 == 0) print(paste("on:", i))
-  temp <- h_fun(background_basex - a$coorx[i], 
-                background_basey - a$coory[i])
-  rho_at_all_no_A[[i]] <- rho_at_all_no_A[[i]] * mean(temp[background_marks > 0]) * bg_weight
-}
-
+rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
+                                                                  background_basex, 
+                                                                  background_basey, 
+                                                                  background_marks, 
+                                                                  TT * ra * bg_weight, 
+                                                                  i = i)
 rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
 
 
 # Update A and mu for the first time
-A <- 0.03
 mu0 <- 0.77
+A <- 0.03
 
 # update according to equations (34) and (35)
 neg_loglik <- function(x){
@@ -316,48 +334,46 @@ bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events
 
 # candidate (i,j) pairs
 
-# create a matrix ij.mat where 
-# [, i] is the i index
-# [, j] lists all events j where j < i
+# create a matrix ij where 
+# `i` is the i index
+# `j` lists all events j where j < i
 # and (i,j) are no more than 2km and 15 days apart
-temp.mat <- (1:nrow(a)) %o% rep(1, nrow(a))
+temp <- (1:nrow(a)) %o% rep(1, nrow(a))
 
-ij.mat <- cbind(c(t(temp.mat)), c(temp.mat))
+ij <- data.frame(i = c(t(temp)), j = c(temp))
 
-ij.mat <- ij.mat[a$days[ij.mat[,1]] > a$days[ij.mat[,2]] & 
-                   a$days[ij.mat[,1]] <= a$days[ij.mat[,2]] + 15.0 & 
-                   abs(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]]) <=2 & 
-                   abs(a$coory[ij.mat[,1]] -a$coory[ij.mat[,2]]) <=2,]
+ij <- ij[a$days[ij$i] > a$days[ij$j] &
+         a$days[ij$i] <= a$days[ij$j] + 15.0 &
+         abs(a$coorx[ij$i] - a$coorx[ij$j]) <= 2 &
+         abs(a$coory[ij$i] - a$coory[ij$j]) <= 2,]
 
 
 # repetance = "repetition corrections, i.e. for how many times the triggering effect at time lag t or the
 # spatial offset (x, y) is observed"
-# expand h_base
-h_base_x <- h_base_x %o% rep(1, d)
-h_base_y <- rep(1, d) %o% h_base_y
 
-g_rep <- rep(0, length(g_base))
-h_rep <- matrix(0, 
+# for each event time, count how many other event times are in the vicinity
+g_rep <- reduce(map(a$days, function(x) as.numeric(g_base < TT - x)), `+`)
+
+h_rep <- Matrix(0L, 
                 ncol = length(h_base_x),
-                nrow = length(h_base_y)) 
+                nrow = length(h_base_y),
+                sparse = TRUE) 
 
 
 for(i in 1:nrow(a)){
-  g_rep[g_base < TT - a$days[i]] <- g_rep[g_base < TT -a$days[i]] + 1  
+  if(!file.exists("h_space_marks")){system("mkdir h_space_marks")}
   
-  if(!file.exists("Excite.Spatail.Marks")){system("mkdir Excite.Spatail.Marks")}
-  
-  fn <- paste0("Excite.Spatail.Marks/crime1-", substr(10000 + i, 2, 5), ".mark")
+  fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
   
   if(!file.exists(fn)){
-    h_mark_temp <- matrix((inpoly(h_base_x + a$coorx[i], 
-                                  h_base_y + a$coory[i], 
+    h_mark_temp <- Matrix((inpoly(h_base_x %o% rep(1, d) + a$coorx[i], 
+                                  rep(1, d) %o% h_base_y + a$coory[i], 
                                   city.boundary$x, 
                                   city.boundary$y) >=0),
-                          ncol=length(h_base_x))
-    save(h_mark_temp, file=fn)
+                          ncol=length(h_base_x), sparse = TRUE)
+    writeMM(h_mark_temp, file = fn)
   } else {
-    load(fn)
+    h_mark_temp <- readMM(fn)
   }
   
   h_rep <- h_rep + h_mark_temp
@@ -374,7 +390,9 @@ h_rep_fun <- function(x,y){
   temp
 }
 
+toc()
 
+tic("enter the loop")
 # ENTER THE LOOP ###############################################################
 
 
@@ -422,21 +440,14 @@ background_basevalue <- matrix(0,
 
 for(i in 1:nrow(a)){
   if (i %% 100 == 0) print(paste("on:", i))
-  fn <- paste("Background.Smoothers/", "bgsmoother-", i, ".val", sep="")
-  load(fn)
+  fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
+  bgsmoother <- readMM(fn)
   background_basevalue <- background_basevalue + bg_probs[i] * bgsmoother
 }
 
 # Standardize the background so its average is 1 inside study area
-background_basevalue <- background_basevalue/mean(background_basevalue[background_marks>=0])
+background_basevalue <- background_basevalue/mean(background_basevalue[background_marks > 0])
 
-
-# then update A and mu_0
-
-# then calculate lambda_i = mu0 * background_i + A * trigger_i
-# and lambda = mu0 * background_all + A * trigger_all
-
-# terminate or loop back
 
 # calculate g(t) and h(s) edge corrections
 g_edge_correction <- unlist(map(a$days, function(x) sum(g_fun(seq(0, TT - x, time_units) + 0.6e-5)) * time_units))
@@ -444,36 +455,24 @@ g_edge_correction <- unlist(map(a$days, function(x) sum(g_fun(seq(0, TT - x, tim
 h_edge_correction <- rep(0, nrow(a))
 
 for(i in 1:nrow(a)){
-  if(!file.exists("Excite.Spatail.Marks")){system("mkdir Excite.Spatail.Marks")}
-  
-  fn <- paste0("Excite.Spatail.Marks/crime1-", substr(10000 + i, 2, 5), ".mark")
-    
-  if(!file.exists(fn)){
-    h_mark_temp <- matrix((inpoly(h_base_x + a$coorx[i], 
-                                  h_base_y + a$coory[i], 
-                                  city.boundary$x, 
-                                  city.boundary$y) >=0),
-                          ncol=length(h_base_x))
-    save(h_mark_temp, file=fn)
-  } else {
-    load(fn)
-  }
+  fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
+  h_mark_temp <- readMM(fn)
   h_edge_correction[i] <- simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
 }
 
 # get g(t) and h(s) propto equations
 
 # evaluate triggering function
-wi_gh <- A * g_fun(a$days[ij.mat[, 1]] - a$days[ij.mat[, 2]]) *
-         h_fun(a$coorx[ij.mat[, 1]] - a$coorx[ij.mat[, 2]],
-               a$coory[ij.mat[, 1]] - a$coory[ij.mat[, 2]]) /
-         lambda_at_events[ij.mat[, 1]]
+wi_gh <- A * g_fun(a$days[ij$i] - a$days[ij$j]) * 
+         h_fun(a$coorx[ij$i] - a$coorx[ij$j],
+               a$coory[ij$i] - a$coory[ij$j]) /
+         lambda_at_events[ij$i]
 
 # I THINK THIS SHOULD BE G_EDGE_CORRECTION
-temp <- hist.weighted(a$days[ij.mat[,1]] - a$days[ij.mat[,2]],
+temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
                       wi_gh / 
-                      (h_edge_correction[ij.mat[, 2]] *
-                       g_rep_fun(a$days[ij.mat[, 1]] - a$days[ij.mat[, 2]])),
+                      (g_edge_correction[ij$j] *
+                       g_rep_fun(a$days[ij$i] - a$days[ij$j])),
                       breaks = g_base)
 
 # where is this bw coming from?
@@ -483,23 +482,26 @@ g_basevalue <- ker.smooth.conv(temp$mids,
 
 g_basevalue <- g_basevalue/simpson(g_basevalue, time_units) 
 
-# update of h_basevalue?
-dis.mat <- cbind(a$coorx[ij.mat[,1]] - a$coorx[ij.mat[,2]], 
-                 a$coory[ij.mat[,1]] - a$coory[ij.mat[,2]])
+# update of h_basevalue
+dis.mat <- cbind(a$coorx[ij$i] - a$coorx[ij$j], 
+                 a$coory[ij$i] - a$coory[ij$j])
+
 
 # I THINK THIS SHOULD BE SPATIAL.EDGE.CORRECTION
+# WHY NO REP CORRECTION?
 temp <- hist.weighted.2D(dis.mat[,1], 
                          dis.mat[,2], 
-                         excite.wghs/(excite.temporal.edge.correction[ij.mat[,2]]), 
+                         wi_gh/(h_edge_correction[ij$j] * h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j], 
+                                                                    a$coory[ij$i] - a$coory[ij$j])), 
                          x.breaks= h_base_x, 
                          y.breaks= h_base_y)
 
 # what is 2.35? something about the maximum distance
-excite.spatial.mark2 <- (h_base_x^2 + h_base_y^2 < 2.35^2)
+excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
 
-# expand repetition fun
-temp <- h_rep_fun(temp$x.mids %o% rep(1, length(temp$y.mids)),
-                  rep(1, length(temp$y.mids)) %o% temp$x.mids)
+# # expand repetition fun
+# temp <- h_rep_fun(temp$x.mids %o% rep(1, length(temp$y.mids)),
+#                   rep(1, length(temp$y.mids)) %o% temp$x.mids)
 
 # cut off Kernel density estimates at distances of more than 2.35^2
 h_basevalue <- ker.smooth.2D.fft(temp$x.mids,
@@ -513,24 +515,7 @@ h_basevalue <- h_basevalue/simpson.2D(h_basevalue, space_units, space_units)
 
 # get background_i and int_background
 # Define a couple of functions which (linearly) interpolate between x and y
-trend_fun <- approxfun(time_marks, trend_basevalue, yleft=0, yright=0)
-
-weekly_fun <- function(x){
-  approxfun(weekly_base, weekly_basevalue,             
-            yleft=0, yright=0)(x - as.integer(x/7)*7)
-}
-
-daily_fun <- function(x){
-  approxfun(daily_base, daily_basevalue,
-            yleft=0, yright=0)(x - as.integer(x))
-}
-
-# interpolate mu_b
-background_fun <- function(x,y) (interp.surface(obj=list(x = background_base$x, 
-                                                         y = background_base$y,
-                                                         z = background_basevalue),
-                                                loc=cbind(x=c(x), y=c(y))))
-
+source("interpolate_fun.R")
 # evaluate background at all events
 bg_at_events_no_mu <- (trend_fun(a$days) * 
                          weekly_fun(a$days) * 
@@ -549,44 +534,24 @@ bg_at_all_no_mu <- (mean(trend_fun(time_marks) *
 
 # get trigger_i and int_trigger
 
-# interpolate g(t)
-g_fun <- approxfun(seq(0, mac_t, time_units) + 0.6e-12,
-                   g_basevalue, 
-                   yleft=0, yright=0)
-
-# interpolate h(s)
-h_fun <- function(x,y){
-  temp <- interp.surface(obj=list(x = h_base_x, 
-                                  y = h_base_y, 
-                                  z = h_basevalue),
-                         loc=cbind(x=c(x), y=c(y))) 
-  temp[is.na(temp)] <- 0
-  temp
-}
-
-# trigger prob rho
-rho_at_events_no_A <- map(1:nrow(a), 
-                          function(i) g_fun(a$days - a$days[i]) * 
-                            h_fun(a$coorx - a$coorx[i], 
-                                  a$coory - a$coory[i]))
+# trigger prob rho 
+# calculating using foreach
+rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
 rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
 
-# this loop takes approx 3h because we need to evaluate 
+# this loop takes approx 1.5h because we need to evaluate 
 # h_fun repeatedly over the entire grid
-bg_weight <- sum(background_marks > 0)/length(background_marks)
 
-# get mean effect of g_fun over the entire time
+# get mean effect of g_fun and h_fun over the entire time and space
 # multiply through with all constants
-rho_at_all_no_A <- map(a$days, function(x) mean(g_fun(time_marks - x)) * TT * ra)
-
-for (i in 1:nrow(a)){
-  if (i %% 100 == 0) print(paste("on:", i))
-  temp <- h_fun(background_basex - a$coorx[i], 
-                background_basey - a$coory[i])
-  rho_at_all_no_A[[i]] <- rho_at_all_no_A[[i]] * mean(temp[background_marks > 0]) * bg_weight
-}
-
+rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
+                                                                  background_basex, 
+                                                                  background_basey, 
+                                                                  background_marks, 
+                                                                  TT * ra * bg_weight, 
+                                                                  i = i)
 rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
+
 
 # update mu0 and A according to equations (34) and (35)
 old_mu0 <- mu0
@@ -598,13 +563,19 @@ res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
 mu0 <- res$par[1]^2
 A <- res$par[2]^2
 
-lambda_at_events <- mu * bgrates.at.events.no.mu + A * triggers.at.events.no.A
+# then calculate lambda_i = mu0 * background_i + A * trigger_i
+# and lambda = mu0 * background_all + A * trigger_all
+
+lambda_at_events <- mu * bg_at_events_no_mu + A * rho_at_all_no_A
 lambda_at_all <- mu0 * bg_at_all_no_mu + A * rho_at_all_no_A
 
-bgprobs <- mu * bgrates.at.events.no.mu / lambda.at.events
+bgprobs <- mu *  bg_at_events_no_mu / lambda_at_events
 
+toc()
+toc()
+# terminate or loop back
+# if (abs(mu0 - old_mu0) < tol | abs(A - old_A) < tol){
+#   break
+# }
 
-if (abs(mu0 - old_mu0) < tol | abs(A - old_A) < tol){
-  break
-}
 
