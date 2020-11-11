@@ -112,7 +112,8 @@ max_t <- 15 # days
 max_s <- 2 # km
 
 time_units <- 0.005
-space_units <- 0.002
+# changed from 0.002 originally
+space_units <- 0.01
 
 # STEP 1
 
@@ -191,9 +192,10 @@ background_marks <- Matrix(inpoly(background_basex,
 
 if (!file.exists("setup_background_basevalue.mtx")){
   # predefine empty matrix
-  background_basevalue <- matrix(0, 
-                                 nrow = length(background_base$x), 
-                                 ncol = length(background_base$y))
+  background_basevalue <- as(matrix(0, 
+                                    nrow = length(background_base$x), 
+                                    ncol = length(background_base$y)),
+                             "dgeMatrix")
   
   if(!file.exists("background_smoothers")){
     system("mkdir background_smoothers")
@@ -210,13 +212,13 @@ if (!file.exists("setup_background_basevalue.mtx")){
         dnorm(background_basex, 
               a$coorx[i],
               a$bandwidth[i]) * 
-          dnorm(background_basey,
-                a$coory[i], 
-                a$bandwidth[i]) /
-          a$bg.integral[i],
+        dnorm(background_basey,
+              a$coory[i], 
+              a$bandwidth[i]) /
+        a$bg.integral[i],
         sparse = TRUE)
       writeMM(bgsmoother, file = fn)
-    } else{
+    } else {
       bgsmoother <- readMM(fn)
     }
     
@@ -251,7 +253,7 @@ h_base_y <- seq(-max_s, max_s, space_units)
 d <- length(h_base_x)
 
 # not entirely sure what's happening here
-h_basevalue <- matrix(
+h_basevalue <- Matrix(
   1/(abs(h_base_x %o% rep(1, d))^2 + 
        abs(rep(1, d) %o% h_base_y)^2 + 1), 
   ncol = d, 
@@ -347,6 +349,9 @@ ij <- ij[a$days[ij$i] > a$days[ij$j] &
          abs(a$coorx[ij$i] - a$coorx[ij$j]) <= 2 &
          abs(a$coory[ij$i] - a$coory[ij$j]) <= 2,]
 
+# distance between (i,j)
+dis <- data.frame(x = a$coorx[ij$i] - a$coorx[ij$j], 
+                  y = a$coory[ij$i] - a$coory[ij$j])
 
 # repetance = "repetition corrections, i.e. for how many times the triggering effect at time lag t or the
 # spatial offset (x, y) is observed"
@@ -356,8 +361,7 @@ g_rep <- reduce(map(a$days, function(x) as.numeric(g_base < TT - x)), `+`)
 
 h_rep <- Matrix(0L, 
                 ncol = length(h_base_x),
-                nrow = length(h_base_y),
-                sparse = TRUE) 
+                nrow = length(h_base_y)) 
 
 
 for(i in 1:nrow(a)){
@@ -370,7 +374,8 @@ for(i in 1:nrow(a)){
                                   rep(1, d) %o% h_base_y + a$coory[i], 
                                   city.boundary$x, 
                                   city.boundary$y) >=0),
-                          ncol=length(h_base_x), sparse = TRUE)
+                                ncol = length(h_base_x),
+                          sparse = TRUE)
     writeMM(h_mark_temp, file = fn)
   } else {
     h_mark_temp <- readMM(fn)
@@ -390,192 +395,190 @@ h_rep_fun <- function(x,y){
   temp
 }
 
+h_rep_value <- h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j], 
+                         a$coory[ij$i] - a$coory[ij$j])
+
 toc()
 
 tic("enter the loop")
 # ENTER THE LOOP ###############################################################
+k <- 1L
 
-
-# get weights wi_daily, wi_weekly, wi_trend, wi_bg
-# calculate w_i_t
-wi_trend <- trend_fun(a$days)/lambda_at_events
-
-# calculate w_i_d
-wi_daily <- daily_fun(a$days) * background_fun(a$coorx, a$coory) / lambda_at_events
-
-# calculate w_i_w
-wi_weekly <- weekly_fun(a$days) * background_fun(a$coorx, a$coory) / lambda_at_events
-
-# use those to get mu_daily, mu_weekly, mu_trend, mu_bg
-
-# ESTIMATE MU_TREND
-
-# same as before, just now including wi_trend
-trend_basevalue <- map(a$days, function(x) wi_trend[i] * dnorm(x - time_marks, 0, 100) / (pnorm(TT, x, 100) - pnorm(0, x, 100)))
-trend_basevalue <- reduce(trend_basevalue, `+`)
-
-# standardize
-trend_basevalue <- trend_basevalue / mean(trend_basevalue)
-
-# ESTIMATE MU_DAILY
-temp <- hist.weighted(day_marks, wi_daily, breaks = daily_base)
-daily_basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_daily)
-
-daily_basevalue <- daily_basevalue / mean(daily_basevalue)
-
-
-# ESTIMATE MU_WEEKLY
-# as before, get intensity at points throughout the week
-temp <- hist.weighted(week_marks, week_weights * wi_weekly, breaks = weekly_base)
-
-# smooth density
-weekly_basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
-# standardize
-weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
-
-# estimate mu_bg
-background_basevalue <- matrix(0, 
-                               nrow=length(background_base$x), 
-                               ncol=length(background_base$y))
-
-for(i in 1:nrow(a)){
-  if (i %% 100 == 0) print(paste("on:", i))
-  fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
-  bgsmoother <- readMM(fn)
-  background_basevalue <- background_basevalue + bg_probs[i] * bgsmoother
-}
-
-# Standardize the background so its average is 1 inside study area
-background_basevalue <- background_basevalue/mean(background_basevalue[background_marks > 0])
-
-
-# calculate g(t) and h(s) edge corrections
-g_edge_correction <- unlist(map(a$days, function(x) sum(g_fun(seq(0, TT - x, time_units) + 0.6e-5)) * time_units))
-
-h_edge_correction <- rep(0, nrow(a))
-
-for(i in 1:nrow(a)){
-  fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
-  h_mark_temp <- readMM(fn)
-  h_edge_correction[i] <- simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
-}
-
-# get g(t) and h(s) propto equations
-
-# evaluate triggering function
-wi_gh <- A * g_fun(a$days[ij$i] - a$days[ij$j]) * 
-         h_fun(a$coorx[ij$i] - a$coorx[ij$j],
-               a$coory[ij$i] - a$coory[ij$j]) /
-         lambda_at_events[ij$i]
-
-# I THINK THIS SHOULD BE G_EDGE_CORRECTION
-temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
-                      wi_gh / 
-                      (g_edge_correction[ij$j] *
-                       g_rep_fun(a$days[ij$i] - a$days[ij$j])),
-                      breaks = g_base)
-
-# where is this bw coming from?
-g_basevalue <- ker.smooth.conv(temp$mids, 
-                               temp$density, 
-                               bandwidth=0.05)
-
-g_basevalue <- g_basevalue/simpson(g_basevalue, time_units) 
-
-# update of h_basevalue
-dis.mat <- cbind(a$coorx[ij$i] - a$coorx[ij$j], 
-                 a$coory[ij$i] - a$coory[ij$j])
-
-
-# I THINK THIS SHOULD BE SPATIAL.EDGE.CORRECTION
-# WHY NO REP CORRECTION?
-temp <- hist.weighted.2D(dis.mat[,1], 
-                         dis.mat[,2], 
-                         wi_gh/(h_edge_correction[ij$j] * h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j], 
-                                                                    a$coory[ij$i] - a$coory[ij$j])), 
-                         x.breaks= h_base_x, 
-                         y.breaks= h_base_y)
-
-# what is 2.35? something about the maximum distance
-excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
-
-# # expand repetition fun
-# temp <- h_rep_fun(temp$x.mids %o% rep(1, length(temp$y.mids)),
-#                   rep(1, length(temp$y.mids)) %o% temp$x.mids)
-
-# cut off Kernel density estimates at distances of more than 2.35^2
-h_basevalue <- ker.smooth.2D.fft(temp$x.mids,
-                                 temp$y.mids, 
+while (k < 40){
+  # get weights wi_daily, wi_weekly, wi_trend, wi_bg
+  # calculate w_i_t
+  wi_trend <- trend_fun(a$days)/lambda_at_events
+  
+  # calculate w_i_d
+  wi_daily <- daily_fun(a$days) * background_fun(a$coorx, a$coory) / lambda_at_events
+  
+  # calculate w_i_w
+  wi_weekly <- weekly_fun(a$days) * background_fun(a$coorx, a$coory) / lambda_at_events
+  
+  # use those to get mu_daily, mu_weekly, mu_trend, mu_bg
+  
+  # ESTIMATE MU_TREND
+  
+  # same as before, just now including wi_trend
+  trend_basevalue <- map(a$days, function(x) wi_trend[i] * dnorm(x - time_marks, 0, 100) / (pnorm(TT, x, 100) - pnorm(0, x, 100)))
+  trend_basevalue <- reduce(trend_basevalue, `+`)
+  
+  # standardize
+  trend_basevalue <- trend_basevalue / mean(trend_basevalue)
+  
+  # ESTIMATE MU_DAILY
+  temp <- hist.weighted(day_marks, wi_daily, breaks = daily_base)
+  daily_basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_daily)
+  
+  daily_basevalue <- daily_basevalue / mean(daily_basevalue)
+  
+  
+  # ESTIMATE MU_WEEKLY
+  # as before, get intensity at points throughout the week
+  temp <- hist.weighted(week_marks, week_weights * wi_weekly, breaks = weekly_base)
+  
+  # smooth density
+  weekly_basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
+  # standardize
+  weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
+  
+  # estimate mu_bg
+  background_basevalue <- Matrix(0, 
+                                 nrow=length(background_base$x), 
+                                 ncol=length(background_base$y))
+  
+  for(i in 1:nrow(a)){
+    if (i %% 100 == 0) print(paste("on:", i))
+    fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
+    bgsmoother <- readMM(fn)
+    background_basevalue <- background_basevalue + bg_probs[i] * bgsmoother
+  }
+  
+  # Standardize the background so its average is 1 inside study area
+  background_basevalue <- background_basevalue / mean(background_basevalue[background_marks > 0])
+  
+  
+  # calculate g(t) and h(s) edge corrections
+  g_edge_correction <- unlist(map(a$days, function(x) sum(g_fun(seq(0, TT - x, time_units) + 0.6e-5)) * time_units))
+  
+  h_edge_correction <- rep(0, nrow(a))
+  
+  for(i in 1:nrow(a)){
+    fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
+    h_mark_temp <- readMM(fn)
+    h_edge_correction[i] <- simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
+  }
+  
+  # get g(t) and h(s) propto equations
+  
+  # evaluate triggering function
+  wi_gh <- A * g_fun(a$days[ij$i] - a$days[ij$j]) * 
+    h_fun(a$coorx[ij$i] - a$coorx[ij$j],
+          a$coory[ij$i] - a$coory[ij$j]) /
+    lambda_at_events[ij$i]
+  
+  # I THINK THIS SHOULD BE G_EDGE_CORRECTION
+  temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
+                        wi_gh / 
+                          (g_edge_correction[ij$j] *
+                             g_rep_fun(a$days[ij$i] - a$days[ij$j])),
+                        breaks = g_base)
+  
+  # where is this bw coming from?
+  g_basevalue <- ker.smooth.conv(temp$mids, 
                                  temp$density, 
-                                 x.bandwidth=0.1, 
-                                 y.bandwidth=0.1) * excite.spatial.mark2
+                                 bandwidth=0.05)
+  
+  g_basevalue <- g_basevalue/simpson(g_basevalue, time_units) 
+  
+  # update of h_basevalue
+  # not originally in the code, but using edge + repetition correction
+  temp <- hist.weighted.2D(dis$x, 
+                           dis$y, 
+                           wi_gh/(h_edge_correction[ij$j] * h_rep_value), 
+                           x.breaks= h_base_x, 
+                           y.breaks= h_base_y)
+  
+  # what is 2.35? something about the maximum distance
+  excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
 
-h_basevalue <- h_basevalue/simpson.2D(h_basevalue, space_units, space_units)
-
-
-# get background_i and int_background
-# Define a couple of functions which (linearly) interpolate between x and y
-source("interpolate_fun.R")
-# evaluate background at all events
-bg_at_events_no_mu <- (trend_fun(a$days) * 
+  # cut off Kernel density estimates at distances of more than 2.35^2
+  h_basevalue <- ker.smooth.2D.fft(temp$x.mids,
+                                   temp$y.mids, 
+                                   temp$density, 
+                                   x.bandwidth=0.1, 
+                                   y.bandwidth=0.1) * excite.spatial.mark2
+  
+  h_basevalue <- h_basevalue/simpson.2D(h_basevalue, space_units, space_units)
+  
+  
+  # get background_i and int_background
+  # Define a couple of functions which (linearly) interpolate between x and y
+  source("interpolate_fun.R")
+  # evaluate background at all events
+  bg_at_events_no_mu <- (trend_fun(a$days) * 
                          weekly_fun(a$days) * 
                          daily_fun(a$days) *
                          background_fun(a$coorx, a$coory))
-
-# mean of background over entire space
-bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
-                           weekly_fun(time_marks) * 
-                           daily_fun(time_marks)) * 
-                      TT *
-                      mean(background_fun(background_basex,
-                                          background_basey) * 
+  
+  # mean of background over entire space
+  bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
+                             weekly_fun(time_marks) * 
+                             daily_fun(time_marks)) * 
+                        TT *
+                        mean(background_fun(background_basex,
+                                            background_basey) * 
                              background_marks) *
-                      ra)
-
-# get trigger_i and int_trigger
-
-# trigger prob rho 
-# calculating using foreach
-rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
-rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
-
-# this loop takes approx 1.5h because we need to evaluate 
-# h_fun repeatedly over the entire grid
-
-# get mean effect of g_fun and h_fun over the entire time and space
-# multiply through with all constants
-rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
-                                                                  background_basex, 
-                                                                  background_basey, 
-                                                                  background_marks, 
-                                                                  TT * ra * bg_weight, 
-                                                                  i = i)
-rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
-
-
-# update mu0 and A according to equations (34) and (35)
-old_mu0 <- mu0
-old_A <- A
-
-res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
-
-# update
-mu0 <- res$par[1]^2
-A <- res$par[2]^2
-
-# then calculate lambda_i = mu0 * background_i + A * trigger_i
-# and lambda = mu0 * background_all + A * trigger_all
-
-lambda_at_events <- mu * bg_at_events_no_mu + A * rho_at_all_no_A
-lambda_at_all <- mu0 * bg_at_all_no_mu + A * rho_at_all_no_A
-
-bgprobs <- mu *  bg_at_events_no_mu / lambda_at_events
-
+                        ra)
+  
+  # get trigger_i and int_trigger
+  
+  # trigger prob rho 
+  # calculating using foreach
+  rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
+  rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
+  
+  # we need to evaluate 
+  # h_fun repeatedly over the entire grid
+  
+  # get mean effect of g_fun and h_fun over the entire time and space
+  # multiply through with all constants
+  rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
+                                                                    background_basex, 
+                                                                    background_basey, 
+                                                                    background_marks, 
+                                                                    TT * ra * bg_weight, 
+                                                                    i = i)
+  rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
+  
+  
+  # update mu0 and A according to equations (34) and (35)
+  old_mu0 <- mu0
+  old_A <- A
+  
+  res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
+  
+  # update
+  mu0 <- res$par[1]^2
+  A <- res$par[2]^2
+  
+  # then calculate lambda_i = mu0 * background_i + A * trigger_i
+  # and lambda = mu0 * background_all + A * trigger_all
+  
+  lambda_at_events <- mu0 * bg_at_events_no_mu + A * rho_at_all_no_A
+  lambda_at_all <- mu0 * bg_at_all_no_mu + A * rho_at_all_no_A
+  
+  bgprobs <- mu0 *  bg_at_events_no_mu / lambda_at_events
+  
+  # terminate or loop back
+  if (abs(mu0 - old_mu0) < tol & abs(A - old_A) < tol){
+    break
+  }
+  k <- k + 1L
+}
 toc()
-toc()
-# terminate or loop back
-# if (abs(mu0 - old_mu0) < tol | abs(A - old_A) < tol){
-#   break
-# }
+if (k == 41) print("loop ended after 40 iterations")
+
+
 
 
