@@ -5,9 +5,6 @@
 source('inpoly.r')
 library(fields)
 
-# pretty self explanatory
-dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
-
 # this is Simpson's integral approximation where you approx
 # int_a^b f(x)dx by splitting [a,b] into m chunks and then calcul
 # (b-a)/2m * (f(a) + 4f(x1) + 2f(x2) + ..+ 4(f(x_m-1) + f(b))
