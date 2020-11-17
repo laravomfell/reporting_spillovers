@@ -26,11 +26,13 @@ da$days <- (unclass(da$datetime_unif) - unclass(min(da$datetime_unif)))/24/60/60
 
 da <- da[order(da$days),]
 
-# add a little bit of jitter
+# turn coordinates into km
+da$coorx <- da$X / 1000
+da$coory <- da$Y / 1000
 
-## coordinate system?
-a$coorx =a$coorx /1000+runif(nrow(a), -0.0005, 0.0005)
-a$coory = a$coory /1000+runif(nrow(a), -0.0005, 0.0005)
+# don't add jitter
+# a$coorx =a$coorx /1000+runif(nrow(a), -0.0005, 0.0005)
+# a$coory = a$coory /1000+runif(nrow(a), -0.0005, 0.0005)
 
 # set ? bandwidth
 a$bandwidth <- rep(0.005,nrow(a))
