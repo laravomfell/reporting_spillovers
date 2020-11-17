@@ -40,3 +40,7 @@ trigger_fun <- function(a, i){
 trigger_int_fun <- function(a, time_marks, background_basex, background_basey, background_marks, constants, i){
   mean(g_fun(time_marks - a$days[i])) * constants * mean(h_fun(background_basex - a$coorx[i], background_basey - a$coory[i])[as.vector(background_marks > 0)])
 }
+
+trigger_at_all_fun <- function(i, constants){
+  g_fun(time_marks - a$days) * constants * h_fun(background_basex - a$coordx[i], background_basey - a$coory[i])[as.vector(background_marks > 0)]
+}
