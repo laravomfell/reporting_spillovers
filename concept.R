@@ -104,15 +104,14 @@ boundary$y <- rev(boundary$y)
 
 # DEFINE PP PARS
 # TT = length of the time interval
-# TT <- 730
-TT <- as.numeric(as.Date(max(a$date)) - as.Date(min(a$date))) + 1
+TT <- as.numeric(as.Date(max(a$datetime_unif)) - as.Date(min(a$datetime_unif))) + 1
 
 # time stamps as 1 year/100 (= 3.65 days)
 time_marks <- seq(0, TT, 1/(TT/3.65))
 
-# range of coordinates (not quite, a little manual)
-x_range <- c(749.440, 754.264)
-y_range <- c(4428.644, 4432.570)
+# range of coordinates
+x_range <- c(bbox["xmin"], bbox["xmax"])
+y_range <- c(bbox["ymin"], bbox["ymax"])
 
 # range of area
 ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
