@@ -73,13 +73,13 @@ da$bg_integral <- rep(0, nrow(da))
 
 w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
 
-for(i in 1:nrow(a)){
-   # calculate exact integral
-   a$bg.integral[i] <- polyCub.exact.Gauss(w,
-                                           mean=c(a$coorx[i], a$coory[i]),
-                                           Sigma=diag(a$bandwidth[i], 2), plot=F)
-   print(paste(i, 'of', nrow(a),":", a$bg.integral[i]))
-   
-}
+#for(i in 1:nrow(da)){
+#   if (i %% 100 == 0) print(paste("on:", i))
+#   # calculate exact integral
+#   da$bg_integral[i] <- polyCub.exact.Gauss(w,
+#                                           mean=c(da$coorx[i], da$coory[i]),
+#                                           Sigma=diag(da$bandwidth[i], 2), 
+#                                           plot=F)
+# }
 
 write.table(a, file="type1_crime_data.table")
