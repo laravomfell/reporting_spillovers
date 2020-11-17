@@ -1,8 +1,15 @@
 
- 
- bgrates.at.all.locations.no.mu <- ((trend.fun(time.marks)*weekly.fun(time.marks)*daily.fun(time.marks))*
-                          mean(background.spatial.fun(background.basex,background.basey)*background.marks)*
-                          (Xrange[2]-Xrange[1])*(Yrange[2]-Yrange[1]))
+
+bg_at_all_locations <- trend_fun(time_marks) * weekly_fun(time_marks) * daily_fun(time_marks) * mean(background_fun(background_basex, 
+                                                                                                                    background_basey) * background_marks) * ra
+
+
+trigger_at_all_locations <- foreach(i = 1:nrow(a)) %dopar% trigger_at_all_fun(i = i, constants = bg_weight * ra)
+# some simplification. I think reduce(.., `+`)
+
+lambda_at_all_locations <- mu0 * bg_at_all_locations + A * trigger_at_all_locations
+
+plot(cumsum(lambda_at_all_locations) * space_units, stepfun(a$days, (0:nrow(a)))(time_marks))
 
 triggers.at.all.locations.no.A <- 0
 
@@ -18,7 +25,7 @@ for(i in 1:nrow(a)){
 
   lambda.at.all.locations <-  mu* bgrates.at.all.locations.no.mu + A * triggers.at.all.locations.no.A
 
-
+  cumsum(lambda_at_events) * space_units
  
 postscript("raw-residual.ps", paper="special", height=7, width=14)
 
