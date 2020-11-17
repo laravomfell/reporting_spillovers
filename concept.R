@@ -56,18 +56,24 @@
 
 # terminate or loop back
 
+
+# SETUP --------------------------------------------------------
 library(spatstat) # must run R with option "--max-ppsize=100000"
 library(purrr)
 library(Matrix)
-
+library(sf)
+library(data.table)
 
 library(foreach)
 library(doParallel)
 library(tictoc)
 
-no_cores <- 2
+no_cores <- parallel::detectCores()
 cl <- makeCluster(no_cores)
 registerDoParallel(cl)
+
+# parameter precision for mu0 and A
+tol <- 0.001
 
 
 # functions
