@@ -355,6 +355,8 @@ neg_loglik <- function(x){
 res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
 
 # update mu0 and A
+# initial values really push down estimates of A
+# maybe don't actually use loglik here and just take good initial values?
 mu0 <- res$par[1]^2
 A <- res$par[2]^2
 
@@ -380,13 +382,14 @@ temp <- (1:nrow(a)) %o% rep(1, nrow(a))
 ij <- data.frame(i = c(t(temp)), j = c(temp))
 
 ij <- ij[a$days[ij$i] > a$days[ij$j] &
-         a$days[ij$i] <= a$days[ij$j] + 15.0 &
-         abs(a$coorx[ij$i] - a$coorx[ij$j]) <= 2 &
-         abs(a$coory[ij$i] - a$coory[ij$j]) <= 2,]
+           a$days[ij$i] < a$days[ij$j] + 15.0 &
+           abs(a$coorx[ij$i] - a$coorx[ij$j]) < 2 &
+           abs(a$coory[ij$i] - a$coory[ij$j]) < 2,]
 
 # distance between (i,j)
 dis <- data.frame(x = a$coorx[ij$i] - a$coorx[ij$j], 
                   y = a$coory[ij$i] - a$coory[ij$j])
+
 
 # repetance = "repetition corrections, i.e. for how many times the triggering effect at time lag t or the
 # spatial offset (x, y) is observed"
