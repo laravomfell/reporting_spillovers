@@ -397,29 +397,38 @@ dis <- data.frame(x = a$coorx[ij$i] - a$coorx[ij$j],
 # for each event time, count how many other event times are in the vicinity
 g_rep <- reduce(map(a$days, function(x) as.numeric(g_base < TT - x)), `+`)
 
-h_rep <- Matrix(0L, 
-                ncol = length(h_base_x),
-                nrow = length(h_base_y)) 
-
-
-for(i in 1:nrow(a)){
-  if(!file.exists("h_space_marks")){system("mkdir h_space_marks")}
+# check if I've already precalculated h_rep previously
+if (!file.exists("h_space_marks/setup_h_rep.csv")){
   
-  fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
+  h_rep <- matrix(0L, 
+                  ncol = length(h_base_x),
+                  nrow = length(h_base_y))
   
-  if(!file.exists(fn)){
-    h_mark_temp <- Matrix((inpoly(h_base_x %o% rep(1, d) + a$coorx[i], 
-                                  rep(1, d) %o% h_base_y + a$coory[i], 
-                                  city.boundary$x, 
-                                  city.boundary$y) >=0),
-                                ncol = length(h_base_x),
-                          sparse = TRUE)
-    writeMM(h_mark_temp, file = fn)
-  } else {
-    h_mark_temp <- readMM(fn)
+  if (!file.exists("h_space_marks")){
+    system("mkdir h_space_marks")
   }
   
-  h_rep <- h_rep + h_mark_temp
+  for(i in 1:nrow(a)){
+    if (i %% 250 == 0) print(paste("on:", i))
+    
+    fn <- paste0("h_space_marks/h_marks_", i, ".csv")
+    
+    h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + a$coorx[i], 
+                                 rep(1, d) %o% h_base_y + a$coory[i], 
+                                 boundary$x, 
+                                 boundary$y) >= 0,
+                          ncol = d)
+    idx <- which(h_mark_temp == FALSE)
+    # no need to write anything if all values are TRUE
+    if (length(idx) == 0) next
+    fwrite(data.table(idx), file = fn)
+    
+    h_rep <- h_rep + h_mark_temp
+  }
+  
+  suppressMessages(fwrite(h_rep, file = "h_space_marks/setup_h_rep.csv"))
+} else {
+  h_rep <- as.matrix(fread("h_space_marks/setup_h_rep.csv"))
 }
 
 g_rep_fun <- approxfun(g_base, g_rep, yleft=1, yright=1)
