@@ -34,36 +34,44 @@ da$coory <- da$Y / 1000
 # a$coorx =a$coorx /1000+runif(nrow(a), -0.0005, 0.0005)
 # a$coory = a$coory /1000+runif(nrow(a), -0.0005, 0.0005)
 
-# set ? bandwidth
-a$bandwidth <- rep(0.005,nrow(a))
+# set bandwidth around events
+da$bandwidth <- rep(0.01, nrow(da))
 
-for(i in 1:nrow(a)){
+for(i in 1:nrow(da)){
    # calculate sq distances to all points not == i
-   temp <- dist.squared(a$coorx[i], a$coory[i], a$coorx[-i], a$coory[-i])
+   temp <- dist.squared(da$coorx[i], da$coory[i], da$coorx[-i], da$coory[-i])
    # keep fifth smallest distance above threshold???
-   # maybe something like we need at least four points nearby??
+   # maybe something like we need at least five points nearby??
    temp2 <- sqrt(sort(temp[temp >= 0.002^2])[5])
    # replace bandwidth if too small otherwise
-   if(a$bandwidth[i] <= temp2){
-      a$bandwidth[i] = temp2
+   if(da$bandwidth[i] <= temp2){
+      da$bandwidth[i] <- temp2
    }
 }
 
 
-# BOUNDARY of CASTELLON
 # Read boundary
-city.boundary <- read.csv(file="castallon_city_boundary.csv")
-city.boundary <- list(x=city.boundary$X, y= city.boundary$Y)
+boundary <- read_sf("cov.shp", crs = 27700)
+boundary <- st_union(boundary)
+boundary <- st_as_sf(boundary)
+# fix tiny hole
+boundary <- st_buffer(boundary, 1)
+# simplify boundary after union
+boundary <- st_simplify(boundary, preserveTopology = TRUE, dTolerance = 0.05)
+# extract boundaries
+bbox <- st_bbox(boundary) / 1000
 
-city.boundary$x= city.boundary$x /1000
-city.boundary$y= city.boundary$y /1000
+boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
+boundary$x <- boundary$X / 1000
+boundary$y <- boundary$Y / 1000
 
-city.boundary$x <- rev(city.boundary$x)
-city.boundary$y <- rev(city.boundary$y)
+# reverse x and y for owin
+boundary$x <- rev(boundary$x)
+boundary$y <- rev(boundary$y)
 
-a$bg.integral <- rep(0, nrow(a))
+da$bg_integral <- rep(0, nrow(da))
 
-w= owin(c(749, 755), c(4428, 4433), poly=city.boundary)
+w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
 
 for(i in 1:nrow(a)){
    # calculate exact integral
