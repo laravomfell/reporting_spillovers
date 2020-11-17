@@ -93,6 +93,8 @@ boundary <- st_buffer(boundary, 1)
 boundary <- st_simplify(boundary, preserveTopology = TRUE, dTolerance = 0.05)
 # extract boundaries
 bbox <- st_bbox(boundary) / 1000
+# extract precise area
+boundary_area <- units::drop_units(st_area(boundary)/1000^2)
 
 boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
 boundary$x <- boundary$X / 1000
@@ -171,7 +173,7 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # 3. smoothing all trend
 
 # split time interval into 3.65 days
-trend_base <- seq(0, 730, time_units)
+trend_base <- seq(0, TT, time_units)
 
 # at each step, we add the density at the event, 
 # normalized by density that lies between 0 and TT (our event window)
@@ -230,8 +232,8 @@ if (!file.exists("background_smoothers/setup_background_basevalue.csv")){
                      a$bg_integral[i])
     # coerce values that are basically zero to be actually zero
     bgsmoother[bgsmoother < 0.001] <- 0
-    bgsmoother <- as(bgsmoother, "sparseMatrix")
-    writeMM(bgsmoother, fn)
+    bgsmoother <- Matrix::Matrix(bgsmoother, sparse = T)
+    Matrix::writeMM(bgsmoother, fn)
   }
   
   smoothers <- foreach(i = 1:nrow(a)) %dopar% make_bg_smoothers(i)
@@ -548,15 +550,16 @@ while (k < 40){
     lambda_at_events[ij$i]
   
   # correct wi_gh by g_edge and g_rep for g(t) update
-  temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
+  ## they actually use this for plotting later on
+  g_temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
                         wi_gh / 
                           (g_edge_correction[ij$j] *
                              g_rep_fun(a$days[ij$i] - a$days[ij$j])),
                         breaks = g_base)
   
   # where is this bw coming from?
-  g_basevalue <- ker.smooth.conv(temp$mids, 
-                                 temp$density, 
+  g_basevalue <- ker.smooth.conv(g_temp$mids, 
+                                 g_temp$density, 
                                  bandwidth=0.05)
   
   g_basevalue <- g_basevalue/simpson(g_basevalue, time_units) 
@@ -638,10 +641,10 @@ while (k < 40){
   # then calculate lambda_i = mu0 * background_i + A * trigger_i
   # and lambda = mu0 * background_all + A * trigger_all
   
-  lambda_at_events <- mu0 * bg_at_events_no_mu + A * rho_at_all_no_A
+  lambda_at_events <- mu0 * bg_at_events_no_mu + A * rho_at_events_no_A
   lambda_at_all <- mu0 * bg_at_all_no_mu + A * rho_at_all_no_A
   
-  bgprobs <- mu0 *  bg_at_events_no_mu / lambda_at_events
+  bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events
   
   # one loop takes approx 3h50min
   toc()
@@ -654,4 +657,24 @@ while (k < 40){
 }
 toc()
 if (k == 41) print("loop ended after 40 iterations")
+stopCluster(cl)
+
+# save results
+system("mkdir results")
+save(purrr::set_names(A, "A"), file = "results/A.Rdata")
+save(purrr::set_names(mu0, "mu0"), file = "results/mu0.Rdata")
+save(g_basevalue, file = "results/g_basevalue.Rdata")
+save(h_basevalue, file = "results/h_basevalue.Rdata")
+save(daily_basevalue, file = "results/daily_basevalue.Rdata")
+save(trend_basevalue, file = "results/trend_basevalue.Rdata")
+save(background_basevalue, file = "results/background_basevalue.Rdata")
+save(weekly_basevalue, file = "results/weekly_basevalue.Rdata")
+save(bg_probs, file = "results/bg_probs.Rdata")
+save(lambda_at_events, file = "results/lambda_at_events.Rdata")
+save(lambda_at_all, file = "results/lambda_at_all.Rdata")
+save(rho_at_all, file = "rho_at_all.Rdata")
+save(rho_at_events_no_A, file = "rho_at_events.Rdata")
+
+
+saveRDS(purrr::set_names(c(A, mu0), c("A", "mu0")), "results/test.rds")
 
