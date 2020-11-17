@@ -79,19 +79,28 @@ tol <- 0.001
 # functions
 source("utils.R")
 
-#tic("one complete run")
 tic("begin setup")
 # read data (from source("prepare_data.R"))
-a <- read.table("type1_crime_data.table")
-# BOUNDARY of CASTELLON
-city.boundary <- read.csv(file = "castallon_city_boundary.csv")
-city.boundary <- list(x = city.boundary$X, y = city.boundary$Y)
+a <- read.csv("da_cleaned.csv")
+# Coventry boundary
+# Read boundary
+boundary <- read_sf("cov.shp", crs = 27700)
+boundary <- st_union(boundary)
+boundary <- st_as_sf(boundary)
+# fix tiny hole
+boundary <- st_buffer(boundary, 1)
+# simplify boundary after union
+boundary <- st_simplify(boundary, preserveTopology = TRUE, dTolerance = 0.05)
+# extract boundaries
+bbox <- st_bbox(boundary) / 1000
 
-city.boundary$x <- city.boundary$x /1000
-city.boundary$y <- city.boundary$y /1000
+boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
+boundary$x <- boundary$X / 1000
+boundary$y <- boundary$Y / 1000
 
-city.boundary$x <- rev(city.boundary$x)
-city.boundary$y <- rev(city.boundary$y)
+# reverse x and y for owin
+boundary$x <- rev(boundary$x)
+boundary$y <- rev(boundary$y)
 
 # DEFINE PP PARS
 # TT = length of the time interval
