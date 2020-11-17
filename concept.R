@@ -198,17 +198,17 @@ background_basey <- rep(1, length(background_base$x))%o% background_base$y
 # boundary anyway
 background_marks <- Matrix(inpoly(background_basex,   
                                   background_basey, 
-                                  city.boundary$x, 
-                                  city.boundary$y) >= 0, 
+                                  boundary$x, 
+                                  boundary$y) >= 0, 
                            ncol = length(background_base$y),
                            sparse = TRUE)
 
 # since the initialization of background_basevalue is slow, 
 # check if I've already pre-calculated it
 
-if (!file.exists("setup_background_basevalue.mtx")){
+if (!file.exists("background_smoothers/setup_background_basevalue.csv")){
   # predefine empty matrix
-  background_basevalue <- as(matrix(0, 
+  background_basevalue <- as(matrix(0,
                                     nrow = length(background_base$x), 
                                     ncol = length(background_base$y)),
                              "dgeMatrix")
@@ -217,36 +217,44 @@ if (!file.exists("setup_background_basevalue.mtx")){
     system("mkdir background_smoothers")
   }
   
-  # for each location on the grid, add density of each event
-  for(i in 1:nrow(a)){
-    
+  make_bg_smoothers <- function(i){
     fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
     
-    if(!file.exists(fn)){
-      
-      bgsmoother <- Matrix(
-        dnorm(background_basex, 
-              a$coorx[i],
-              a$bandwidth[i]) * 
-        dnorm(background_basey,
-              a$coory[i], 
-              a$bandwidth[i]) /
-        a$bg.integral[i],
-        sparse = TRUE)
-      writeMM(bgsmoother, file = fn)
-    } else {
-      bgsmoother <- readMM(fn)
-    }
+    # for each location on the grid, add density of each event
+    bgsmoother <- (dnorm(background_basex, 
+                         a$coorx[i],
+                         a$bandwidth[i]) * 
+                     dnorm(background_basey,
+                           a$coory[i], 
+                           a$bandwidth[i]) /
+                     a$bg_integral[i])
+    # coerce values that are basically zero to be actually zero
+    bgsmoother[bgsmoother < 0.001] <- 0
+    bgsmoother <- as(bgsmoother, "sparseMatrix")
+    writeMM(bgsmoother, fn)
+  }
+  
+  smoothers <- foreach(i = 1:nrow(a)) %dopar% make_bg_smoothers(i)
+  
+  
+  for(i in 1:nrow(a)){
+    if (i %% 250 == 0) print(paste("on:", i))
+    
+    fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
+    bgsmoother <- readMM(fn)
     
     background_basevalue <- background_basevalue + bgsmoother
   }
   
   # standardize the background so its average inside the study window is 1
-  background_basevalue <- background_basevalue / mean(background_basevalue[background_marks > 0])
-  writeMM(background_basevalue, file = "setup_background_basevalue.mtx")
+  background_basevalue <- background_basevalue / mean(background_basevalue[as.vector(background_marks > 0)])
+  suppressMessages(fwrite(as.matrix(background_basevalue), 
+                          file = "background_smoothers/setup_background_basevalue.csv"))
+  
 } else {
-  background_basevalue <- readMM("setup_background_basevalue.mtx")
+  background_basevalue <- as.matrix(fread("background_smoothers/setup_background_basevalue.csv"))
 }
+
 
 
 # init g(t)
