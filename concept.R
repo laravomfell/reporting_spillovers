@@ -129,6 +129,7 @@ time_units <- 0.005
 # changed from 0.002 originally
 space_units <- 0.01
 
+
 # STEP 1
 
 # init mu_d
@@ -174,8 +175,9 @@ trend_base <- seq(0, 730, time_units)
 
 # at each step, we add the density at the event, 
 # normalized by density that lies between 0 and TT (our event window)
-trend_basevalue <- map(a$days, function(x) dnorm(x - time_marks, 0, 100) / (pnorm(TT, x, 100) - pnorm(0, x, 100)))
-trend_basevalue <- reduce(trend_basevalue, `+`)
+# We'll be reusing the raw, unnormalized quantities 
+raw_trend_basevalue <- map(a$days, function(x) dnorm(x - time_marks, 0, 100) / (pnorm(TT, x, 100) - pnorm(0, x, 100)))
+trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
 # standardize
 trend_basevalue <- trend_basevalue / mean(trend_basevalue)
