@@ -82,4 +82,17 @@ w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = b
 #                                           plot=F)
 # }
 
-write.table(a, file="type1_crime_data.table")
+
+foo <- function(x, mu, sigma){
+   mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
+}
+
+da$bg_integral <- foreach(i = 1:nrow(da),
+                          .combine = "c") %dopar% polyCub::polyCub.SV(w,
+                                                                      foo,
+                                                                      mu=c(da$coorx[i], da$coory[i]),
+                                                                      sigma=sqrt(da$bandwidth[i]),
+                                                                      plot=F,
+                                                                      nGQ = 15)
+
+write.csv(da, file = "da_cleaned.csv")
