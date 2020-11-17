@@ -497,19 +497,20 @@ while (k < 40){
   weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
   
   # estimate mu_bg
-  background_basevalue <- Matrix(0, 
-                                 nrow=length(background_base$x), 
-                                 ncol=length(background_base$y))
+  background_basevalue <- as(matrix(0, 
+                                    nrow = length(background_base$x), 
+                                    col = length(background_base$y)),
+                             "dgeMatrix")
   
   for(i in 1:nrow(a)){
-    if (i %% 100 == 0) print(paste("on:", i))
+    if (i %% 250 == 0) print(paste("on:", i))
     fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
     bgsmoother <- readMM(fn)
     background_basevalue <- background_basevalue + bg_probs[i] * bgsmoother
   }
   
   # Standardize the background so its average is 1 inside study area
-  background_basevalue <- background_basevalue / mean(background_basevalue[background_marks > 0])
+  background_basevalue <- background_basevalue / mean(background_basevalue[as.vector(background_marks > 0)])
   
   
   # calculate g(t) and h(s) edge corrections
