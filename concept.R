@@ -449,12 +449,16 @@ h_rep_value <- h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j],
 excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
 
 toc()
+# approx 1.5h after precalculating everything
 
 tic("enter the loop")
 # ENTER THE LOOP ###############################################################
 k <- 1L
 
 while (k < 40){
+  tic(paste("loop", k))
+  print("updating background")
+  
   # get weights wi_daily, wi_weekly, wi_trend, wi_bg
   # calculate w_i_t
   wi_trend <- trend_fun(a$days)/lambda_at_events
@@ -470,7 +474,7 @@ while (k < 40){
   # ESTIMATE MU_TREND
   
   # same as before, just now including wi_trend
-  trend_basevalue <- map(a$days, function(x) wi_trend[i] * dnorm(x - time_marks, 0, 100) / (pnorm(TT, x, 100) - pnorm(0, x, 100)))
+  trend_basevalue <- map2(raw_trend_basevalue, wi_trend, function(x,y) x*y)
   trend_basevalue <- reduce(trend_basevalue, `+`)
   
   # standardize
