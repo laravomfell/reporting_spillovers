@@ -19,19 +19,13 @@ da <- read.csv(file="da_small.csv")
 # keep only the original reports
 da <- da[da$ms_type == 0,]
 
-crimes$hour <- substr(crimes$time,1,2)
-crimes$minute <- substr(crimes$time,4,5)
-crimes$second <- substr(crimes$time,7,8)
+da$datetime_unif <- as.POSIXct(da$datetime_unif, tz = "Europe/London")
 
-crimes$days <-(julian(as.Date(crimes$date), orig=as.Date('2012-1-1'))
-               +as.double(crimes$hour)/24
-               +as.double(crimes$minute)/24/60
-               +as.double(crimes$second)/24/60/60 )
+# calculate time in seconds since t0, turn into 1/day units
+da$days <- (unclass(da$datetime_unif) - unclass(min(da$datetime_unif)))/24/60/60
 
-# crime type == 1
-a<-crimes[crimes[,4]==1,]
+da <- da[order(da$days),]
 
-a <- a[order(a$days),]
 # add a little bit of jitter
 
 ## coordinate system?
