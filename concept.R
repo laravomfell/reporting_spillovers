@@ -538,6 +538,7 @@ while (k < 40){
   h_edge_correction <- foreach(i = 1:nrow(a),
                                .combine = "c") %dopar% calc_h_edge_corr(i)
   
+  print("updating trigger functions")
   # get g(t) and h(s) propto equations
   
   # evaluate triggering function
@@ -546,7 +547,7 @@ while (k < 40){
           a$coory[ij$i] - a$coory[ij$j]) /
     lambda_at_events[ij$i]
   
-  # I THINK THIS SHOULD BE G_EDGE_CORRECTION
+  # correct wi_gh by g_edge and g_rep for g(t) update
   temp <- hist.weighted(a$days[ij$i] - a$days[ij$j],
                         wi_gh / 
                           (g_edge_correction[ij$j] *
@@ -568,27 +569,25 @@ while (k < 40){
                            x.breaks= h_base_x, 
                            y.breaks= h_base_y)
   
-  # what is 2.35? something about the maximum distance
-  excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
-
   # cut off Kernel density estimates at distances of more than 2.35^2
   h_basevalue <- ker.smooth.2D.fft(temp$x.mids,
                                    temp$y.mids, 
                                    temp$density, 
-                                   x.bandwidth=0.1, 
-                                   y.bandwidth=0.1) * excite.spatial.mark2
+                                   x.bandwidth = 0.1, 
+                                   y.bandwidth = 0.1) * excite.spatial.mark2
   
   h_basevalue <- h_basevalue/simpson.2D(h_basevalue, space_units, space_units)
   
+  print("calculating background")
   
   # get background_i and int_background
   # Define a couple of functions which (linearly) interpolate between x and y
   source("interpolate_fun.R")
   # evaluate background at all events
   bg_at_events_no_mu <- (trend_fun(a$days) * 
-                         weekly_fun(a$days) * 
-                         daily_fun(a$days) *
-                         background_fun(a$coorx, a$coory))
+                           weekly_fun(a$days) * 
+                           daily_fun(a$days) *
+                           background_fun(a$coorx, a$coory))
   
   # mean of background over entire space
   bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
@@ -597,9 +596,10 @@ while (k < 40){
                         TT *
                         mean(background_fun(background_basex,
                                             background_basey) * 
-                             background_marks) *
+                               background_marks) *
                         ra)
   
+  print("calculating trigger")
   # get trigger_i and int_trigger
   
   # trigger prob rho 
@@ -620,6 +620,7 @@ while (k < 40){
                                                                     i = i)
   rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
   
+  print("updating mu0 and A")
   
   # update mu0 and A according to equations (34) and (35)
   old_mu0 <- mu0
@@ -631,6 +632,9 @@ while (k < 40){
   mu0 <- res$par[1]^2
   A <- res$par[2]^2
   
+  print(paste("old mu0:", old_mu0, "new mu0:", mu0, "diff:", abs(mu0 - old_mu0)))
+  print(paste("old A:", old_A, "new A:", A, "diff:", abs(A - old_A)))
+  
   # then calculate lambda_i = mu0 * background_i + A * trigger_i
   # and lambda = mu0 * background_all + A * trigger_all
   
@@ -639,15 +643,15 @@ while (k < 40){
   
   bgprobs <- mu0 *  bg_at_events_no_mu / lambda_at_events
   
+  # one loop takes approx 3h50min
+  toc()
   # terminate or loop back
   if (abs(mu0 - old_mu0) < tol & abs(A - old_A) < tol){
     break
   }
   k <- k + 1L
+  gc()
 }
 toc()
 if (k == 41) print("loop ended after 40 iterations")
-
-
-
 
