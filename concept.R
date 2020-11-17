@@ -299,7 +299,7 @@ bg_at_events_no_mu <- (trend_fun(a$days) *
 # mean of background over entire space
 bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
                          weekly_fun(time_marks) * 
-                           daily_fun(time_marks)) * 
+                         daily_fun(time_marks)) * 
                     TT *
                     mean(background_fun(background_basex,
                                         background_basey) * 
@@ -308,22 +308,33 @@ bg_at_all_no_mu <- (mean(trend_fun(time_marks) *
 
 # trigger prob rho 
 # calculating using foreach
-rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
-rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
+if (!file.exists("setup_rho_at_events.Rdata")){
+  rho_at_events_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
+  rho_at_events_no_A <- reduce(rho_at_events_no_A, `+`)
+  save(rho_at_events_no_A, file = "setup_rho_at_events.Rdata")
+} else {
+  load("setup_rho_at_events.Rdata")
+}
 
 # this loop takes approx 1.5h because we need to evaluate 
 # h_fun repeatedly over the entire grid
 bg_weight <- sum(background_marks > 0)/length(background_marks)
 
+
 # get mean effect of g_fun and h_fun over the entire time and space
 # multiply through with all constants
-rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
-                                                                  background_basex, 
-                                                                  background_basey, 
-                                                                  background_marks, 
-                                                                  TT * ra * bg_weight, 
-                                                                  i = i)
-rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
+if (!file.exists("setup_rho_int.Rdata")){
+  rho_at_all_no_A <- foreach(i = 1:nrow(a)) %dopar% trigger_int_fun(a, time_marks, 
+                                                                    background_basex, 
+                                                                    background_basey, 
+                                                                    background_marks, 
+                                                                    TT * ra * bg_weight, 
+                                                                    i = i)
+  rho_at_all_no_A <- reduce(rho_at_all_no_A, sum)
+  save(rho_at_all_no_A, file = "setup_rho_int.Rdata")
+} else {
+  load("setup_rho_int.Rdata")
+}
 
 
 # Update A and mu for the first time
