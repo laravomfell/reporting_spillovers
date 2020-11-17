@@ -10,10 +10,14 @@ library(doParallel)
 no_cores <- parallel::detectCores()
 cl <- makeCluster(no_cores)
 registerDoParallel(cl)
-# THIS CAN BE SKIPPED IF type1_crime_datatable already exists
 
-# Read Crime data
-crimes <-read.csv(file="salida_puntos_llamada.csv",head=TRUE,sep=",")
+# pretty self explanatory
+dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
+
+# read crime data
+da <- read.csv(file="da_small.csv")
+# keep only the original reports
+da <- da[da$ms_type == 0,]
 
 crimes$hour <- substr(crimes$time,1,2)
 crimes$minute <- substr(crimes$time,4,5)
