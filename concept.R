@@ -513,16 +513,30 @@ while (k < 40){
   background_basevalue <- background_basevalue / mean(background_basevalue[as.vector(background_marks > 0)])
   
   
+  print("calculating trigger edge corrections")
+  
   # calculate g(t) and h(s) edge corrections
   g_edge_correction <- unlist(map(a$days, function(x) sum(g_fun(seq(0, TT - x, time_units) + 0.6e-5)) * time_units))
   
-  h_edge_correction <- rep(0, nrow(a))
   
-  for(i in 1:nrow(a)){
-    fn <- paste0("h_space_marks/crime_", substr(10000 + i, 2, 5), ".mtx")
-    h_mark_temp <- readMM(fn)
-    h_edge_correction[i] <- simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
+  calc_h_edge_corr <- function(i){
+    # create matrix of TRUE's in correct dimensions
+    fn <- paste0("h_space_marks/h_marks_", i, ".csv")
+    h_mark_temp <- matrix(TRUE, nrow = d, ncol = d)
+    
+    # if some elements are FALSE (checked by file.exists),
+    # set to FALSE
+    if (file.exists(fn)){
+      idx <- data.table::fread(fn)
+      h_mark_temp[idx$idx] <- FALSE
+    }
+    # and calculate Simpson integral approximation
+    simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
   }
+  
+  # calculate edge correction in parallel
+  h_edge_correction <- foreach(i = 1:nrow(a),
+                               .combine = "c") %dopar% calc_h_edge_corr(i)
   
   # get g(t) and h(s) propto equations
   
