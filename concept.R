@@ -445,6 +445,9 @@ h_rep_fun <- function(x,y){
 h_rep_value <- h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j], 
                          a$coory[ij$i] - a$coory[ij$j])
 
+# what is 2.35? something about the maximum distance
+excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
+
 toc()
 
 tic("enter the loop")
