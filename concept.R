@@ -84,19 +84,19 @@ tic("begin setup")
 a <- read.csv("da_cleaned.csv")
 # Coventry boundary
 # Read boundary
-boundary <- read_sf("cov.shp", crs = 27700)
-boundary <- st_union(boundary)
-boundary <- st_as_sf(boundary)
+shp <- read_sf("cov.shp", crs = 27700)
+shp <- st_union(shp)
+shp <- st_as_sf(shp)
 # fix tiny hole
-boundary <- st_buffer(boundary, 1)
-# simplify boundary after union
-boundary <- st_simplify(boundary, preserveTopology = TRUE, dTolerance = 0.05)
+shp <- st_buffer(shp, 1)
+# simplify shp after union
+shp <- st_simplify(shp, preserveTopology = TRUE, dTolerance = 0.05)
 # extract boundaries
-bbox <- st_bbox(boundary) / 1000
+bbox <- st_bbox(shp) / 1000
 # extract precise area
-boundary_area <- units::drop_units(st_area(boundary)/1000^2)
+shp_area <- units::drop_units(st_area(shp)/1000^2)
 
-boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
+boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
 boundary$x <- boundary$X / 1000
 boundary$y <- boundary$Y / 1000
 
@@ -172,9 +172,6 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # init mu_t
 # 3. smoothing all trend
 
-# split time interval into 3.65 days
-trend_base <- seq(0, TT, time_units)
-
 # at each step, we add the density at the event, 
 # normalized by density that lies between 0 and TT (our event window)
 # We'll be reusing the raw, unnormalized quantities 
@@ -183,6 +180,7 @@ trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
 # standardize
 trend_basevalue <- trend_basevalue / mean(trend_basevalue)
+
 
 # init mu_bg
 # this background rates needs to integrate 1 over the study area
@@ -238,7 +236,6 @@ if (!file.exists("background_smoothers/setup_background_basevalue.csv")){
   
   smoothers <- foreach(i = 1:nrow(a)) %dopar% make_bg_smoothers(i)
   
-  
   for(i in 1:nrow(a)){
     if (i %% 250 == 0) print(paste("on:", i))
     
@@ -279,7 +276,7 @@ h_base_y <- seq(-max_s, max_s, space_units)
 d <- length(h_base_x)
 
 # not entirely sure what's happening here
-h_basevalue <- Matrix(
+h_basevalue <- matrix(
   1/(abs(h_base_x %o% rep(1, d))^2 + 
        abs(rep(1, d) %o% h_base_y)^2 + 1), 
   ncol = d, 
@@ -340,8 +337,8 @@ if (!file.exists("setup_rho_int.Rdata")){
 
 
 # Update A and mu for the first time
-mu0 <- 0.77
-A <- 0.03
+mu0 <- 0.2
+A <- 0.10
 
 # update according to equations (34) and (35)
 neg_loglik <- function(x){
@@ -354,13 +351,13 @@ neg_loglik <- function(x){
   - sum(log(lambda_at_events)) + lambda_at_all
 }
 
-res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
+#res <- optim(par=sqrt(c(mu0, A)), neg_loglik)
 
 # update mu0 and A
 # initial values really push down estimates of A
 # maybe don't actually use loglik here and just take good initial values?
-mu0 <- res$par[1]^2
-A <- res$par[2]^2
+# mu0 <- res$par[1]^2
+# A <- res$par[2]^2
 
 
 # update other quantities
@@ -409,22 +406,22 @@ if (!file.exists("h_space_marks/setup_h_rep.csv")){
   if (!file.exists("h_space_marks")){
     system("mkdir h_space_marks")
   }
-  
+
   for(i in 1:nrow(a)){
     if (i %% 250 == 0) print(paste("on:", i))
-    
+
     fn <- paste0("h_space_marks/h_marks_", i, ".csv")
-    
-    h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + a$coorx[i], 
-                                 rep(1, d) %o% h_base_y + a$coory[i], 
-                                 boundary$x, 
+
+    h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + a$coorx[i],
+                                 rep(1, d) %o% h_base_y + a$coory[i],
+                                 boundary$x,
                                  boundary$y) >= 0,
                           ncol = d)
     idx <- which(h_mark_temp == FALSE)
     # no need to write anything if all values are TRUE
     if (length(idx) == 0) next
     fwrite(data.table(idx), file = fn)
-    
+
     h_rep <- h_rep + h_mark_temp
   }
   
@@ -451,7 +448,7 @@ h_rep_value <- h_rep_fun(a$coorx[ij$i] - a$coorx[ij$j],
 excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
 
 toc()
-# approx 1.5h after precalculating everything
+# approx 2min after precalculating everything
 
 tic("enter the loop")
 # ENTER THE LOOP ###############################################################
@@ -501,11 +498,11 @@ while (k < 40){
   # estimate mu_bg
   background_basevalue <- as(matrix(0, 
                                     nrow = length(background_base$x), 
-                                    col = length(background_base$y)),
+                                    ncol = length(background_base$y)),
                              "dgeMatrix")
   
   for(i in 1:nrow(a)){
-    if (i %% 250 == 0) print(paste("on:", i))
+    if (i %% 250 == 0) print(paste("on bgsmoother:", i))
     fn <- paste0("background_smoothers/", "bgsmoother_", i, ".mtx")
     bgsmoother <- readMM(fn)
     background_basevalue <- background_basevalue + bg_probs[i] * bgsmoother
@@ -522,15 +519,15 @@ while (k < 40){
   
   
   calc_h_edge_corr <- function(i){
-    # create matrix of TRUE's in correct dimensions
+    # create matrix of 1's in correct dimensions
     fn <- paste0("h_space_marks/h_marks_", i, ".csv")
-    h_mark_temp <- matrix(TRUE, nrow = d, ncol = d)
+    h_mark_temp <- matrix(1L, nrow = d, ncol = d)
     
-    # if some elements are FALSE (checked by file.exists),
-    # set to FALSE
+    # if some elements are 0 (checked by file.exists),
+    # set to 0
     if (file.exists(fn)){
       idx <- data.table::fread(fn)
-      h_mark_temp[idx$idx] <- FALSE
+      h_mark_temp[idx$idx] <- 0L
     }
     # and calculate Simpson integral approximation
     simpson.2D(h_mark_temp * h_basevalue, space_units, space_units)
@@ -629,7 +626,7 @@ while (k < 40){
   old_mu0 <- mu0
   old_A <- A
   
-  res <- optim(par=sqrt(c(mu0, A)), neg_loglik, control=list(trace=6))
+  res <- optim(par=sqrt(c(mu0, A)), neg_loglik)
   
   # update
   mu0 <- res$par[1]^2
@@ -653,7 +650,7 @@ while (k < 40){
     break
   }
   k <- k + 1L
-  gc()
+  invisible(gc())
 }
 toc()
 if (k == 41) print("loop ended after 40 iterations")
@@ -661,8 +658,8 @@ stopCluster(cl)
 
 # save results
 system("mkdir results")
-save(purrr::set_names(A, "A"), file = "results/A.Rdata")
-save(purrr::set_names(mu0, "mu0"), file = "results/mu0.Rdata")
+save(A, file = "results/A.Rdata")
+save(mu0, file = "results/mu0.Rdata")
 save(g_basevalue, file = "results/g_basevalue.Rdata")
 save(h_basevalue, file = "results/h_basevalue.Rdata")
 save(daily_basevalue, file = "results/daily_basevalue.Rdata")
@@ -672,9 +669,10 @@ save(weekly_basevalue, file = "results/weekly_basevalue.Rdata")
 save(bg_probs, file = "results/bg_probs.Rdata")
 save(lambda_at_events, file = "results/lambda_at_events.Rdata")
 save(lambda_at_all, file = "results/lambda_at_all.Rdata")
-save(rho_at_all, file = "rho_at_all.Rdata")
+save(rho_at_all_no_A, file = "rho_at_all.Rdata")
 save(rho_at_events_no_A, file = "rho_at_events.Rdata")
+save(g_temp, file = "g_temp.Rdata")
+save(bg_at_all_no_mu, file = "bg_at_all.Rdata")
+save(bg_at_events_no_mu, file = "bg_at_events.Rdata")
 
-
-saveRDS(purrr::set_names(c(A, mu0), c("A", "mu0")), "results/test.rds")
 
