@@ -19,35 +19,46 @@ theme_set(theme_print())
 # plotting mu_bg and overlaying it with streets
 mu_bg <- cbind(expand.grid(x = background_base$x,
                           y = background_base$y),
-               z = as.vector((background_basevalue * (background_marks)/TT/boundary_area)))
+               z = as.vector((background_basevalue * (background_marks)/TT/shp_area)))
 # drop undefined values
 mu_bg <- mu_bg[mu_bg$z > 0,]
 
-# get streets
-street_values <- c("motorway",
-                   "trunk",
-                   "primary", "secondary", "tertiary")
-street_values <- c(street_values, paste0(street_values, "_link"),
-                    "unclassified", "residential", "living_street", "pedestrian")
 
-# define query for all roads
-roads <- opq(bbox = osm_bbox) %>%
-  add_osm_feature(key = "highway", value = street_values) %>%
-  osmdata_sf()
-roads <- roads$osm_lines
+if (file.exists("roads.shp")){
+  roads <- st_read("roads.shp", crs = 27700)
+} else {
+  # get streets
+  street_values <- c("motorway",
+                     "trunk",
+                     "primary", "secondary", "tertiary")
+  street_values <- c(street_values, paste0(street_values, "_link"),
+                     "unclassified", "residential", "living_street", "pedestrian")
+  
+  
+  osm_bbox <- st_bbox(st_transform(st_as_sfc(bbox * 1000), 4326))
+  # define query for all roads
+  roads <- opq(bbox = osm_bbox, timeout = 50) %>%
+    add_osm_feature(key = "highway", value = street_values) %>%
+    osmdata_sf()
+  roads <- roads$osm_lines
+  
+  # keep only the lines inside shp
+  roads <- st_transform(roads, crs = 27700)
+  roads <- st_intersection(roads, shp)
+  
+  # define line thinkness for streets
+  roads$lw <- dplyr::case_when(roads$highway %in% c("residential", 
+                                                    "unclassified", 
+                                                    "tertiary", 
+                                                    "tertiary_link", 
+                                                    "living_street") ~ "B",
+                               roads$highway == "pedestrian" ~ "C",
+                               TRUE ~ "A")
+  
+  roads <- subset(roads, select = c("osm_id", "name", "highway", "lw"))
+  st_write(roads, dsn = "roads.shp", delete_dsn=TRUE)
+}
 
-# keep only the lines inside shp
-roads <- st_transform(roads, crs = 27700)
-roads <- st_intersection(roads, shp)
-
-# define line thinkness for streets
-roads$street_fill <- dplyr::case_when(roads$highway %in% c("residential", 
-                                                           "unclassified", 
-                                                           "tertiary", 
-                                                           "tertiary_link", 
-                                                           "living_street") ~ "B",
-                                      roads$highway == "pedestrian" ~ "C",
-                                      TRUE ~ "A")
 
 p <- ggplot() + 
   # plot underlying background intensity
@@ -57,7 +68,7 @@ p <- ggplot() +
                        breaks = c(0.000001, 0.00001, 0.01),
                        labels = c(0.000001, 0.00001, 0.01)) + 
   # add roads
-  geom_sf(data = roads, aes(size = street_fill), inherit.aes = F) +
+  geom_sf(data = roads, aes(size = lw), inherit.aes = F) +
   scale_size_manual(values = c("A" = .75, "B" = .65, "C" = .4), guide = FALSE) +
   coord_sf(datum = NA) +
   labs(x = "", y = "")
