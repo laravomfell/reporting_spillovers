@@ -17,7 +17,7 @@ dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 # read crime data
 da <- read.csv(file="da_small.csv")
 # keep only the original reports
-da <- da[da$ms_type == 0,]
+#da <- da[da$ms_type == 0,]
 
 da$datetime_unif <- as.POSIXct(da$datetime_unif, tz = "Europe/London")
 
@@ -95,4 +95,5 @@ da$bg_integral <- foreach(i = 1:nrow(da),
                                                                       plot=F,
                                                                       nGQ = 15)
 
-write.csv(da, file = "da_cleaned.csv")
+write.csv(da, file = "da_cleaned_type.csv")
+stopCluster(cl)
