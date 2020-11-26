@@ -33,7 +33,8 @@ h_fun <- function(x,y){
 }
 
 trigger_fun <- function(a, i){
-  g_fun(a$days - a$days[i]) * h_fun(a$coorx - a$coorx[i], a$coory - a$coory[i])
+  g_fun(a$days[a$e_type == 0] - a$days[i]) * h_fun(a$coorx[a$e_type == 0] - a$coorx[i], 
+                                                   a$coory[a$e_type == 0] - a$coory[i])
 }
 
 
@@ -44,3 +45,4 @@ trigger_int_fun <- function(a, time_marks, background_basex, background_basey, b
 trigger_at_all_fun <- function(i, constants){
   g_fun(time_marks - a$days[i]) * constants * mean(h_fun(background_basex - a$coorx[i], background_basey - a$coory[i])[as.vector(background_marks > 0)])
 }
+
