@@ -7,9 +7,12 @@ bg_at_all_locations <- trend_fun(time_marks) * weekly_fun(time_marks) * daily_fu
 
 
 trigger_at_all_locations <- foreach(i = 1:nrow(a)) %dopar% trigger_at_all_fun(i = i, constants = bg_weight * ra)
-trigger_at_all_locations <- reduce(trigger_at_all_locations, `+`)
+# reduce by event type
+trigger_at_all_locations <- map(event_types, function(x) reduce(trigger_at_all_locations[a$e_type == x],
+                                                                `+`))
 
-lambda_at_all_locations <- mu0 * bg_at_all_locations + A * trigger_at_all_locations
+# multiply through with theta and simplify
+lambda_at_all_locations <- mu0 * bg_at_all_locations + reduce(map2(trigger_at_all_locations, theta, `*`), `+`)
 save(lambda_at_all_locations, file = "results/lambda_at_all_locations.Rdata")
 
 
