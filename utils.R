@@ -105,7 +105,10 @@ hist.weighted.2D <- function(x, y, weight, x.breaks, y.breaks){
 }
 
 
-# this function does what?
+# this function calculate the convolution of two functions f and
+# f is just the density coming from our weighted histogram
+# g is c(kernel of [0,1], -kernel of [0,1])
+# we then calculate f x g = F^-1(F(f) * F(g))
 ker.smooth.fft<- function(x, z, bandwidth){
 
   nx <- length(z)
@@ -119,9 +122,9 @@ ker.smooth.fft<- function(x, z, bandwidth){
   ker.val.x <- dnorm((1:nx)*dx-dx/2, 0, sd=bandwidth)
   ker.val.x <- c(ker.val.x, rev(ker.val.x))
   
-  # ???
+  # calulate the convolution
   smoothed <- fft(fft(zz) *fft(ker.val.x), inverse=T)/nx/2*dx
-  # ???
+  # Re returns the real part of smoothed (ignoring the imaginary part)
   Re(smoothed[1:(nx+1)])
 }
 
