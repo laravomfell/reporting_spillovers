@@ -73,15 +73,14 @@ cl <- makeCluster(no_cores)
 registerDoParallel(cl)
 
 # parameter precision for mu0 and A
-tol <- 0.001
-
+tol <- 1e-5
 
 # functions
 source("utils.R")
 
 tic("begin setup")
 # read data (from source("prepare_data.R"))
-a <- read.csv("da_cleaned_type.csv")
+a <- read.csv("da_type.csv")
 
 event_types <- purrr::set_names(unique(a$e_type))
 # i also need the rev_id
@@ -92,12 +91,6 @@ id[!is.na(id)] <- 1:sum(!is.na(id))
 # Coventry boundary
 # Read boundary
 shp <- read_sf("cov.shp", crs = 27700)
-shp <- st_union(shp)
-shp <- st_as_sf(shp)
-# fix tiny hole
-shp <- st_buffer(shp, 1)
-# simplify shp after union
-shp <- st_simplify(shp, preserveTopology = TRUE, dTolerance = 0.05)
 # extract boundaries
 bbox <- st_bbox(shp) / 1000
 # extract precise area
@@ -116,7 +109,7 @@ boundary$y <- rev(boundary$y)
 TT <- as.numeric(as.Date(max(a$datetime_unif[a$e_type == 0])) - 
                  as.Date(min(a$datetime_unif[a$e_type == 0]))) + 1
 
-# time stamps as 1 year/100 (= 3.65 days)
+# time stamps spaced out as 1/100 days (= 14min)
 time_marks <- seq(0, TT, 1/(TT/3.65))
 
 # range of coordinates
@@ -128,8 +121,14 @@ ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
 
 # SET UP KERNEL BW
 # from paper
-bw_daily <- 0.03
-bw_weekly <- 0.5
+# bw_daily <- 0.03
+# bw_weekly <- 0.5
+# bw_trend <- 30
+
+# let's try rule of thumb estimators
+bw_daily <- 0.04
+bw_weekly <- 0.48
+bw_trend <- 49.9
 
 # maximum trigger ranges allowed
 max_t <- 15 # days
@@ -139,13 +138,17 @@ time_units <- 0.005
 # changed from 0.002 originally
 space_units <- 0.01
 
+# bw_g and bw_h
+# fixed at units * 10
+bw_g <- 0.05
+bw_h <- 0.1
 
 # STEP 1
 
 # init mu_d
 # 1. smoothing daily 
 
-# daily_base is splitting the day into roughly 6min chunks
+# daily_base is splitting the day into roughly 7.5min chunks
 daily_base <- seq(0, 1, time_units)
 
 # calculate how far into the day each event happened. unit: 1/days
@@ -186,12 +189,11 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # normalized by density that lies between 0 and TT (our event window)
 # We'll be reusing the raw, unnormalized quantities 
 raw_trend_basevalue <- map(a$days[a$e_type == 0], 
-                           function(x) dnorm(x - time_marks, 0, 50) / (pnorm(TT, x, 50) - pnorm(0, x, 50)))
+                           function(x) dnorm(x - time_marks, 0, bw_trend) / (pnorm(TT, x, bw_trend) - pnorm(0, x, bw_trend)))
 trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
 # standardize
 trend_basevalue <- trend_basevalue / mean(trend_basevalue)
-
 
 # init mu_bg
 # this background rates needs to integrate 1 over the study area
@@ -246,7 +248,6 @@ if (!file.exists("background_smoothers/setup_background_basevalue.csv")){
   }
   
   smoothers <- foreach(i = which(a$e_type == 0)) %dopar% make_bg_smoothers(i)
-  #smoothers <- foreach(i = 1:nrow(a)) %dopar% make_bg_smoothers(i)
   
   for (i in which(a$e_type == 0)){
     if (i %% 500 == 0) print(paste("on:", i))
@@ -274,7 +275,7 @@ if (!file.exists("background_smoothers/setup_background_basevalue.csv")){
 # these are just some initial values where we don't 
 # expect any effect after more than 15 days
 g_base <- seq(0, max_t, time_units)
-g_basevalue <- (0.05 + g_base/10)^(-1.03)
+g_basevalue <- (0.05 + g_base/10)^(-1)
 
 # we normalize by the integral over the entire time window
 g_basevalue <- g_basevalue / simpson(g_basevalue, time_units)
@@ -287,11 +288,11 @@ h_base_x <- seq(-max_s, max_s, space_units)
 h_base_y <- seq(-max_s, max_s, space_units)
 d <- length(h_base_x)
 
-# not entirely sure what's happening here
+# should h_basevalue be 0 at (0,0) dist?
 h_basevalue <- matrix(
   1/(abs(h_base_x %o% rep(1, d))^2 + 
        abs(rep(1, d) %o% h_base_y)^2 + 1), 
-  ncol = d, 
+  ncol = d,
   nrow = d)
 
 # normalize by integral over the entire spatial window
@@ -356,7 +357,7 @@ if (!file.exists("setup_rho_int.Rdata")){
 
 # Update A and mu for the first time
 mu0 <- 0.2
-theta <- c(0.1, 0.1)
+theta <- c(0.01, 0.01)
 
 # update according to equations (34) and (35)
 # neg_loglik <- function(x){
@@ -392,8 +393,10 @@ res <- optim(par = sqrt(c(mu0, theta)), neg_loglik)
 
 # initial values really push down estimates of A
 # maybe don't actually use loglik here and just take good initial values?
-# mu0 <- res$par[1]^2
-# theta <- res$par[-1]^2
+mu0 <- res$par[1]^2
+theta <- res$par[-1]^2
+print(paste("mu0", mu0))
+print(paste("theta", theta))
 
 
 # update other quantities
@@ -606,7 +609,7 @@ while (k < 40){
   # where is this bw coming from?
   g_basevalue <- ker.smooth.conv(g_temp$mids, 
                                  g_temp$density, 
-                                 bandwidth=0.05)
+                                 bandwidth = bw_g)
   
   g_basevalue <- g_basevalue/simpson(g_basevalue, time_units) 
   
@@ -625,8 +628,8 @@ while (k < 40){
   h_basevalue <- ker.smooth.2D.fft(temp$x.mids,
                                    temp$y.mids, 
                                    temp$density, 
-                                   x.bandwidth = 0.1, 
-                                   y.bandwidth = 0.1) * excite.spatial.mark2
+                                   x.bandwidth = bw_h, 
+                                   y.bandwidth = bw_h) * excite.spatial.mark2
   
   h_basevalue <- h_basevalue/simpson.2D(h_basevalue, space_units, space_units)
   
@@ -659,6 +662,7 @@ while (k < 40){
   # calculating using foreach
   ### change
   rho_at_events_no_theta <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
+  
   rho_at_events_no_theta <- map(event_types, function(x) reduce(rho_at_events_no_theta[a$e_type == x],
                                                                 `+`))
   #rho_at_events_no_theta <- reduce(rho_at_events_no_theta, `+`)
@@ -709,7 +713,8 @@ while (k < 40){
   # one loop takes approx 1h40min
   toc()
   # terminate or loop back
-  if (abs(mu0 - old_mu0) < tol & all(abs(theta - old_theta) < tol)){
+  conv <- abs(mu0 - old_mu0) < tol & all(abs(theta - old_theta) < tol)
+  if (k > 5 & conv){
     break
   }
   k <- k + 1L
@@ -717,10 +722,24 @@ while (k < 40){
 }
 toc()
 if (k == 41) print("loop ended after 40 iterations")
+
+# I also want to keep track of influential events
+influ_events <- foreach(i = 1:nrow(a)) %dopar% trigger_fun(a = a, i = i)
+influ_events <- do.call(rbind, influ_events)
+
 stopCluster(cl)
 
 # save results
 system("mkdir results")
+# save config
+config <- data.frame(bw_daily = bw_daily,
+                     bw_weekly = bw_weekly,
+                     bw_trend = bw_trend,
+                     bw_g = bw_g,
+                     bw_h = bw_h,
+                     k = k)
+save(config, file = "results/config.Rdata")
+
 save(theta, file = "results/theta.Rdata")
 save(mu0, file = "results/mu0.Rdata")
 save(g_basevalue, file = "results/g_basevalue.Rdata")
@@ -737,5 +756,6 @@ save(rho_at_events_no_theta, file = "results/rho_at_events.Rdata")
 save(g_temp, file = "results/g_temp.Rdata")
 save(bg_at_all_no_mu, file = "results/bg_at_all.Rdata")
 save(bg_at_events_no_mu, file = "results/bg_at_events.Rdata")
+save(influ_events, file = "results/influ_mat.Rdata")
 
 
