@@ -1,15 +1,7 @@
+# functions needed for periodic and non-periodic models
+
 # Define a couple of functions which (linearly) interpolate between x and y
 trend_fun <- approxfun(time_marks, trend_basevalue, yleft=0, yright=0)
-
-weekly_fun <- function(x){
-  approxfun(weekly_base, weekly_basevalue,             
-            yleft=0, yright=0)(x - as.integer(x/7)*7)
-}
-
-daily_fun <- function(x){
-  approxfun(daily_base, daily_basevalue,
-            yleft=0, yright=0)(x - as.integer(x))
-}
 
 # interpolate mu_b
 background_fun <- function(x,y) (interp.surface(obj=list(x = background_base$x, 
@@ -46,3 +38,13 @@ trigger_at_all_fun <- function(i, constants){
   g_fun(time_marks - a$days[i]) * constants * mean(h_fun(background_basex - a$coorx[i], background_basey - a$coory[i])[as.vector(background_marks > 0)])
 }
 
+# functions only needed for periodic function
+weekly_fun <- function(x){
+  approxfun(weekly_base, weekly_basevalue,             
+            yleft=0, yright=0)(x - as.integer(x/7)*7)
+}
+
+daily_fun <- function(x){
+  approxfun(daily_base, daily_basevalue,
+            yleft=0, yright=0)(x - as.integer(x))
+}
