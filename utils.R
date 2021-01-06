@@ -1,6 +1,10 @@
-# First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
+source2 <- function(file, start, end, ...) {
+  file.lines <- scan(file, what=character(), skip=start-1, nlines=end-start+1, sep='\n', quiet = T)
+  file.lines.collapsed <- paste(file.lines, collapse='\n')
+  source(textConnection(file.lines.collapsed), ...)
+}
 
-# Let us introduce function \texttt{hist.weighted.2D} and \texttt{ker.smooth.2D.fft}.
+# First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
  
 source('inpoly.r')
 library(fields)
