@@ -73,7 +73,7 @@ cl <- makeCluster(no_cores)
 registerDoParallel(cl)
 
 # parameter precision for mu0 and A
-tol <- 1e-5
+tol <- 1e-4
 
 # functions
 source("utils.R")
@@ -120,16 +120,9 @@ y_range <- c(bbox["ymin"], bbox["ymax"])
 ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
 
 # SET UP KERNEL BW
-# from paper
-# bw_daily <- 0.03
-# bw_weekly <- 0.5
-# bw_trend <- 30
-
-# let's try rule of thumb estimators
-bw_daily <- 0.04
-bw_weekly <- 0.48
-bw_trend <- 49.9
-
+bw_daily <- 1/24 #60min
+bw_weekly <- 1/3 # 8h
+bw_trend <- 10 # 10 days
 # maximum trigger ranges allowed
 max_t <- 15 # days
 max_s <- 2 # km
@@ -185,11 +178,12 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # init mu_t
 # 3. smoothing all trend
 
-# at each step, we add the density at the event, 
-# normalized by density that lies between 0 and TT (our event window)
-# We'll be reusing the raw, unnormalized quantities 
-raw_trend_basevalue <- map(a$days[a$e_type == 0], 
-                           function(x) dnorm(x - time_marks, 0, bw_trend) / (pnorm(TT, x, bw_trend) - pnorm(0, x, bw_trend)))
+# modified edge correction
+raw_trend_basevalue <- map(a$days[a$e_type == 0],
+                           function(x) dnorm(x - time_marks, 0, bw_trend) + 
+                                       dnorm(x + time_marks, 0, bw_trend) +
+                                       dnorm(x + 2 * TT - time_marks, TT, bw_trend))
+
 trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
 # standardize
@@ -422,9 +416,9 @@ bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events
 ij <- expand.grid(i = which(a$e_type == 0), j = 1:nrow(a))
 
 ij <- ij[a$days[ij$i] > a$days[ij$j] &
-         a$days[ij$i] < a$days[ij$j] + 15.0 &
-         abs(a$coorx[ij$i] - a$coorx[ij$j]) < 2 &
-         abs(a$coory[ij$i] - a$coory[ij$j]) < 2,]
+         a$days[ij$i] < a$days[ij$j] + max_t &
+         abs(a$coorx[ij$i] - a$coorx[ij$j]) < max_s &
+         abs(a$coory[ij$i] - a$coory[ij$j]) < max_s,]
 
 # distance between (i,j)
 dis <- data.frame(x = a$coorx[ij$i] - a$coorx[ij$j], 
@@ -509,7 +503,8 @@ while (k < 40){
   
   # get weights wi_daily, wi_weekly, wi_trend, wi_bg
   # calculate w_i_t
-  wi_trend <- trend_fun(a$days[a$e_type == 0])/lambda_at_events
+  wi_trend <- trend_fun(a$days[a$e_type == 0]) * background_fun(a$coorx[a$e_type == 0], 
+                                                                a$coory[a$e_type == 0]) / lambda_at_events
   
   # calculate w_i_d
   wi_daily <- daily_fun(a$days[a$e_type == 0]) * background_fun(a$coorx[a$e_type == 0], 
@@ -714,9 +709,14 @@ while (k < 40){
   toc()
   # terminate or loop back
   conv <- abs(mu0 - old_mu0) < tol & all(abs(theta - old_theta) < tol)
-  if (k > 5 & conv){
+  if (conv){
     break
   }
+  # if (k == 3){
+  #   print("k = 3")
+  #   break
+  # }
+  
   k <- k + 1L
   invisible(gc())
 }
