@@ -7,6 +7,9 @@ gpclibPermit()
 library(foreach)
 library(doParallel)
 
+# set seed to jitter
+set.seed(1)
+
 no_cores <- parallel::detectCores()
 cl <- makeCluster(no_cores)
 registerDoParallel(cl)
@@ -15,14 +18,12 @@ registerDoParallel(cl)
 dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 
 # read crime data
-da <- read.csv(file="da_small.csv")
-# keep only the original reports
-#da <- da[da$ms_type == 0,]
+da <- read.csv(file="da.csv")
 
 da$datetime_unif <- as.POSIXct(da$datetime_unif, tz = "Europe/London")
 
 # calculate time in seconds since t0, turn into 1/day units
-da$days <- (unclass(da$datetime_unif) - unclass(min(da$datetime_unif)))/24/60/60
+da$days <- (unclass(da$datetime_unif) - unclass(min(as.POSIXct(as.Date(da$datetime_unif)))))/24/60/60
 
 da <- da[order(da$days),]
 
@@ -30,9 +31,9 @@ da <- da[order(da$days),]
 da$coorx <- da$X / 1000
 da$coory <- da$Y / 1000
 
-# don't add jitter
-# a$coorx =a$coorx /1000+runif(nrow(a), -0.0005, 0.0005)
-# a$coory = a$coory /1000+runif(nrow(a), -0.0005, 0.0005)
+# add jitter
+da$coorx <- da$coorx + runif(nrow(da), -0.0005, 0.0005)
+da$coory <- da$coory + runif(nrow(da), -0.0005, 0.0005)
 
 # set bandwidth around events
 da$bandwidth <- rep(0.01, nrow(da))
@@ -40,8 +41,7 @@ da$bandwidth <- rep(0.01, nrow(da))
 for(i in 1:nrow(da)){
    # calculate sq distances to all points not == i
    temp <- dist.squared(da$coorx[i], da$coory[i], da$coorx[-i], da$coory[-i])
-   # keep fifth smallest distance above threshold???
-   # maybe something like we need at least five points nearby??
+   # n_p = 5
    temp2 <- sqrt(sort(temp[temp >= 0.002^2])[5])
    # replace bandwidth if too small otherwise
    if(da$bandwidth[i] <= temp2){
@@ -52,12 +52,6 @@ for(i in 1:nrow(da)){
 
 # Read boundary
 boundary <- read_sf("cov.shp", crs = 27700)
-boundary <- st_union(boundary)
-boundary <- st_as_sf(boundary)
-# fix tiny hole
-boundary <- st_buffer(boundary, 1)
-# simplify boundary after union
-boundary <- st_simplify(boundary, preserveTopology = TRUE, dTolerance = 0.05)
 # extract boundaries
 bbox <- st_bbox(boundary) / 1000
 
@@ -95,5 +89,5 @@ da$bg_integral <- foreach(i = 1:nrow(da),
                                                                       plot=F,
                                                                       nGQ = 15)
 
-write.csv(da, file = "da_cleaned_type.csv")
+write.csv(da, file = "da_type.csv", row.names = F)
 stopCluster(cl)
