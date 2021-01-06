@@ -49,13 +49,34 @@ p <- ggplot() +
                                 barwidth = unit(45, units = "mm")))
 ggsave("figures/mu_bg.png", plot = p, width = 3.5, height = 4)
 
+# i want all mu plots to be on the same axis scale, the most variable is day_week so choose that
+
+# multiply through day and week
+day_week <- data.frame(x = weekly_base,
+                       y = daily_fun(weekly_base) * weekly_fun(weekly_base))
+
+y_lim <- range(day_week$y)
+y_breaks <- pretty(y_lim)
+
+
+p <- ggplot(day_week, aes(x, y))+ geom_line() +
+  scale_x_continuous(breaks = seq(0, 6), 
+                     labels = paste(wkd_labs, "00:00"), 
+                     expand = c(0.02, 0.02)) +
+  scale_y_continuous(limits = y_lim, breaks = y_breaks) +
+  labs(x = "Time", y = parse(text = "mu[daily](t)~x~mu[weekly](t)"))
+ggsave("figures/day_week.png", plot = p, width = 5.5, height = 3.5)
+
+
 # plotting mu_trend
 trend <- data.frame(x = time_marks, y = trend_basevalue)
 
 p <- ggplot(trend, aes(x,y)) + geom_line() +
   scale_x_continuous(breaks = c(0, 90, 181, 273, 364),
-                     labels = c("01/Jan 2018", "01/Apr 2018", "01/Jul 2018", "01/Oct 2018", "31/Dec 2018")) +
-  labs(x = "", y = parse(text = "mu[trend](t)")) + theme(panel.grid = element_blank()) +
+                     labels = c("01/Jan 2018", "01/Apr 2018", "01/Jul 2018", 
+                                "01/Oct 2018", "31/Dec 2018")) +
+  labs(x = "", y = parse(text = "mu[trend](t)")) + 
+  scale_y_continuous(limits = y_lim, breaks = y_breaks) +
   theme(plot.margin = margin(t = 4, r = 12, b = 4, l = 4, unit = "pt"))
 ggsave("figures/mu_trend.png", plot = p, width = 5.5, height = 3.5)
 
@@ -66,16 +87,17 @@ wkd_labs <- unique(weekdays(a$datetime_unif, abbreviate = T))
 weekly <- data.frame(x = weekly_base, y = weekly_basevalue)
 p <- ggplot(weekly, aes(x,y)) + geom_line() +
   scale_x_continuous(breaks = seq(0, 6), labels = wkd_labs, expand = c(0.02, 0.02)) +
-  labs(x = "Day of week", y = parse(text = "mu[weekly](t)")) + theme(panel.grid = element_blank())
+  scale_y_continuous(limits = y_lim, breaks = y_breaks) +
+  labs(x = "Day of week", y = parse(text = "mu[weekly](t)"))
 ggsave("figures/mu_weekly.png", plot = p, width = 5.5, height = 3.5)
 
 # plotting mu_daily
 daily <- data.frame(x = daily_base, y = daily_basevalue)
 p <- ggplot(daily, aes(x, y)) + geom_line() +
   scale_x_continuous(breaks = seq(0, 1, .25), 
-                     labels = c("0:00", "06:00", "12:00", "18:00", "0:00"),
+                     labels = c("00:00", "06:00", "12:00", "18:00", "00:00"),
                      expand = c(0.02, 0.02)) +
-  theme(panel.grid = element_blank()) +
+  scale_y_continuous(limits = y_lim, breaks = y_breaks) +
   labs(x = "Time of day", y = parse(text = "mu[daily](t)"))
 ggsave("figures/mu_daily.png", plot = p, width = 5.5, height = 3.5)
 
@@ -96,13 +118,14 @@ h_s <- cbind(expand.grid(x = h_base_x * 1000, y = h_base_y * 1000),
             z = as.vector(h_basevalue))
 
 cont_label <- data.frame(x = -10, 
-                         y = c(-180, -140, -110, -80, -35), 
-                         label = seq(0.25, 0.65, by = 0.1))
+                         y = c(-200, -178, -145, -118, -90, -55, 0), 
+                         b = seq(0.2, 0.8, by = 0.1),
+                         label = c("", seq(0.3, 0.7, by = 0.1), ""))
 
 p <- ggplot(h_s[h_s$z > 0.2,], aes(x,y,z = z)) + 
   geom_contour(color = "black", breaks = cont_label$label) +
   labs(x = "Distance in X (in m)", y = "Distance in Y (in m)") + 
-  coord_fixed(xlim = c(-200, 200), ylim = c(-200, 200)) + 
+  coord_fixed(xlim = c(-220, 220), ylim = c(-220, 220)) + 
   # hacky solution to overplot white on the black circles
   geom_label(data = cont_label, aes(x,y,label = label), 
              inherit.aes = F, 
@@ -117,11 +140,4 @@ p <- ggplot(h_s[h_s$z > 0.2,], aes(x,y,z = z)) +
 ggsave("figures/hs.png", plot = p, width = 3.5, height = 3.5)
 
 
-# multiply through day and week
-day_week <- data.frame(x = weekly_base,
-                       y = daily_fun(weekly_base) * weekly_fun(weekly_base))
 
-p <- ggplot(day_week, aes(x, y))+ geom_line() +
-  scale_x_continuous(breaks = seq(0, 6), labels = paste(wkd_labs, "00:00"), expand = c(0.02, 0.02)) +
-  labs(x = "Time", y = parse(text = "mu[daily](t)~x~mu[weekly](t)"))
-ggsave("figures/day_week.png", plot = p, width = 5.5, height = 3.5)
