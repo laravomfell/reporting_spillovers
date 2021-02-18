@@ -1,16 +1,16 @@
 # (No) Spillovers in reporting domestic abuse to police
 
-This Github repo contains the code used to produce the analysis for ``(No) Spillovers in reporting domestic abuse to police'' by Lara Vomfell and Jan Povala.
+This Github repo contains the code used to produce the analysis for _(No) Spillovers in reporting domestic abuse to police_ by Lara Vomfell and Jan Povala.
 
 This research is based on data resources provided by an unnamed English police force and were provided to us under an Information Sharing Agreement. We cannot make the data publicly available or give the precise location of where the study took place.
 
 To nonetheless provide a working version of our code, we generate synthetic data on a circle in the unit square. The `run.R` file calls all files used in our analysis, beginning with the generation of the synthetic data.
 
-Some parts of the inference procedure are adapted from code provided by J. Zhuang and J. Mateu for their paper ``A semiparametric spatiotemporal Hawkes-type point process model with periodic background for crime data'' in the Journal of the Royal Statistical Society A, 182 (2019), 919--942. The code is available from [here](https://rss.onlinelibrary.wiley.com/hub/journal/1467985x/series-a-datasets/182_3).
+Some parts of the inference procedure are adapted from [code](https://rss.onlinelibrary.wiley.com/hub/journal/1467985x/series-a-datasets/182_3) provided by J. Zhuang and J. Mateu for [their paper](https://doi.org/10.1111/rssa.12429) _A semiparametric spatiotemporal Hawkes-type point process model with periodic background for crime data_.
 
 Please let me know if you find any errors!
 
-`
+```R
 sessionInfo()
 R version 4.0.3 (2020-10-10)
 Platform: x86_64-w64-mingw32/x64 (64-bit)
@@ -39,4 +39,4 @@ loaded via a namespace (and not attached):
 [25] classInt_0.4-3       abind_1.4-5          deldir_0.1-29        dplyr_1.0.2          polyclip_1.10-0      tools_4.0.3         
 [31] magrittr_2.0.1       maps_3.3.0           goftest_1.2-2        tibble_3.0.6         crayon_1.4.1         pkgconfig_2.0.3     
 [37] ellipsis_0.3.1       praise_1.0.0         R6_2.5.0             units_0.6-7          compiler_4.0.3  
-`   
+``` 
