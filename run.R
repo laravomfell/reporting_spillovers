@@ -1,0 +1,170 @@
+# This run file reproduces all the analyses for the project 
+#`(No) Spillovers in domestic abuse reporting'
+# by Lara Vomfell and Jan Povala.
+
+# Author: Lara Vomfell
+# Date: 11/02/2021
+
+# The original underlying the project cannot be shared. Also, we cannot identify
+# the location of the police force who provided us with the data. 
+# As a consequence, we also cannot share some of the GIS operations but we
+# try to provide as much of the analysis code as possible.
+
+# In the real example, we create a bounding grid over the shapefile
+# and then evaluate over the entire grid.
+# For the synthetic data, we generate events on a circle bounded by [0,1]
+# such that the bounding grid is the unit square.
+
+# note that running `5_plot_deprivation.R` and `6_plot_detached.R` will not work
+# since in the original, we match on 2011 ONS census unit strings
+# which our synthesized data does not have.
+
+# We also note that quite a few code operations are parallelized.
+# This code was written on a 64-bit Windows 10 machine, if you use a different
+# operating system you might have to change some steps.
+
+# Preliminaries ---------------------------------------------------------------
+
+# required libraries
+library(spatstat)
+library(purrr)
+library(Matrix)
+library(fields)
+library(sf)
+library(data.table)
+library(optparse)
+# needed for plotting files that will not work on synthetic data
+# library(readxl)
+
+library(polyCub)
+library(mvtnorm)
+gpclibPermit()
+
+# set up parallel
+library(foreach)
+library(doParallel)
+no_cores <- parallel::detectCores()
+cl <- makeCluster(no_cores/2)
+registerDoParallel(cl)
+
+# A few plot settings
+library(snakecase)
+library(ggplot2)
+library(scales)
+
+# default plot theme
+theme_print <- function(...){
+  theme_classic() +
+    theme(strip.text = element_text(colour = 'black'),
+          axis.text = element_text(color = "black"),
+          axis.ticks = element_line(color = "black")) +
+    theme(...)
+}
+theme_set(theme_print())
+
+# define a custom labelling function for the scale to turn 0.001 into 10^-3
+label_custom <- function(...){
+  function(x) label_parse()(gsub("10\\^00", "1", gsub("\\+", "", gsub("1e", "10^", scientific_format()(x)))))
+}
+# similar idea, but also works for numbers that are not multiples of 10
+label_10 <- function(...){
+  function(x) label_parse()(gsub("e", "~x~10^", gsub("0e\\+00", "0", scientific_format()(x))))
+}
+
+# set parameter precision
+tol <- 1e-5
+
+# run once
+if (!file.exists("poly.dll") & !file.exists("poly.so")){
+  stop("You need to run 'R CMD SHLIB poly.f' on the command line once to install a (fast) Fortran version of inpoly check")
+}
+
+# import utility functions for kernels
+source("utils.R")
+
+# create folders for auxiliary files
+system("mkdir background_smoothers")
+system("mkdir h_space_marks")
+system("mkdir figures")
+system("mkdir results")
+
+# here we would normally load our shapefile, but instead we use the generated circle
+# create circle with radius 9.3km which given an area similaro to the area we study.
+angle_increments <- 2 * pi / 1000
+# create angles
+ang <- seq(0, 2 * pi - angle_increments, by = angle_increments)
+circ <- data.frame(x = 9.3 + 9.3 * cos(ang),
+                   y = 9.3 + 9.3 * sin(ang))
+w <- owin(poly = circ)
+
+###############################################################################
+#                                  MAIN PART                                  #
+###############################################################################
+
+default_start_date <- "2018-01-01"
+default_end_date <- "2018-12-31"
+
+###############################################################################
+#                                   PARSING                                   #
+###############################################################################
+
+option_list = list(
+    make_option("--regenerate", action="store_true", default=FALSE),
+    make_option(c("-n", "--numsmooth"), type="integer", default=5, 
+                help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
+    make_option("--allevents", type="integer", default=2000,
+                help="Number of all events, [default= %default]", metavar="integer"),
+    make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
+                help="Start date.", metavar="character"),
+    make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
+                help="End date.", metavar="character"),
+    make_option("--follow_trig_prob", type="numeric", default=0.05,
+                help="Percentage of the triggered events that generate follow up events."),
+    make_option(c("-i", "--experimentid"), type="character", default="experiment_var_np",
+                help="Experiment name for easier identification of files and results.", metavar="character"),
+    make_option(c("--parents_proportion"), type="numeric", default=0.8,
+                help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events.")
+);
+
+opt_parser = OptionParser(option_list=option_list);
+opt = parse_args(opt_parser);
+
+regen_data <- opt$regenerate
+n_p <- opt$numsmooth
+start_date <- as.POSIXct(opt$startdate)
+end_date <- as.POSIXct(opt$enddate)
+num_all_events <- opt$allevents
+followup_trig_prob <- opt$follow_trig_prob
+parents_proportion <- opt$parents_proportion
+experiment_id <- paste0(opt$experimentid,
+                        "_np_", n_p,
+                        "_numevents_", num_all_events,
+                        "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
+                        "_parents_proportion_", gsub('\\.', '_', parents_proportion))
+
+# Synthetic data generation ---------------------------------------------------
+if (regen_data) {
+    print("Regenerating synthetic data.")
+    library(stpp)
+    source("1_generate_data.R")
+} else {
+    da = fread(file = paste0("da_", experiment_id, ".csv"))
+}
+
+# Running the model -----------------------------------------------------------
+source("2_model.R")
+
+# Plot raw data summaries -----------------------------------------------------------
+source("3_plot_data_summaries.R")
+
+# Plot model components -------------------------------------------------------
+source("4_plot_model_components.R")
+
+# Plot against deprivation ----------------------------------------------------
+# source("5_plot_deprivation.R")
+
+# Plot against detached -------------------------------------------------------
+# source("6_plot_detached.R")
+
+# Plot model fit --------------------------------------------------------------
+source("7_plot_model_fit.R")
