@@ -60,16 +60,6 @@ TT <- ceiling(max(da$days))
 # time stamps spaced out as 1/100 days (= 14min)
 time_marks <- seq(0, TT, 1/(TT/3.65))
 
-
-# SET UP KERNEL BANDWIDTHS
-
-# daily bw = 60min
-bw_daily <- 1.0 /24.0 
-# weekly bw = 8h
-bw_weekly <- 1.0 / 3.0
-# trend bw = 20 days
-bw_trend <- 20
-
 # maximum trigger ranges allowed
 # 30 days and 2km
 max_t <- 30
@@ -79,12 +69,6 @@ max_s <- 2
 # 50m and ~7.5 min
 time_units <- 0.005
 space_units <- 0.05
-
-# spatial and temporal trigger bandwidths
-# bw_g and bw_h
-# 1 day and 500m
-bw_g <- 1
-bw_h <- 0.5
 
 # Initialization --------------------------------------------------------------
 
@@ -204,8 +188,8 @@ background_basevalue <- background_basevalue / mean(background_basevalue[as.vect
 
 
 # 5. initialize temporal triggering kernel
-g_base <- seq(0, max_t, time_units)  # max_t is the maximum number of days for a trigger to occur, set to 30 currently
-g_basevalue <- (1/24 + g_base/24)^(-1) # Initialisation of the g() component
+g_base <- seq(0, max_t, time_units)
+g_basevalue <- (1/24 + g_base/24)^(-1)
 
 # we normalize by the integral over the entire time window
 g_basevalue <- g_basevalue / simpson(g_basevalue, time_units)
@@ -215,7 +199,7 @@ h_base_x <- seq(-max_s, max_s, space_units)
 h_base_y <- seq(-max_s, max_s, space_units)
 d <- length(h_base_x)
 
-h_basevalue <- matrix(   ## TODO: would we not want to take square root here for the distance?
+h_basevalue <- matrix(
   1/(abs(h_base_x %o% rep(1, d))^2 +
        abs(rep(1, d) %o% h_base_y)^2 + 1),
   ncol = d,
@@ -237,7 +221,7 @@ bg_at_events_no_mu <- (trend_fun(da$days[da$e_type == 0]) *
                        background_fun(da$coorx[da$e_type == 0], 
                                       da$coory[da$e_type == 0]))
 
-# integral of background                                                        #### Why are we multiplying it by TT and ra?
+# integral of background
 bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
                          weekly_fun(time_marks) * 
                          daily_fun(time_marks)) * 
@@ -245,11 +229,11 @@ bg_at_all_no_mu <- (mean(trend_fun(time_marks) *
                     mean(background_fun(background_basex,
                                         background_basey) * 
                          background_marks) *
-                    ra)                                                       #### Should we not be multiplying by bg_weight?
+                    ra)
 
 # 7. trigger
 
-# at events, for both event types                                               #### This is not quite the rho as it is not divided by lambda?
+# at events, for both event types
 rho_at_events_no_theta <- foreach(i = 1:nrow(da)) %dopar% trigger_fun(a = da, i = i)
   
 # simplify
@@ -260,8 +244,7 @@ rho_at_events_no_theta <- map(event_types,
 # h_fun repeatedly over the entire grid)
 
 # precalculate some terms
-bg_weight <- sum(background_marks > 0)/length(background_marks)                 #### proportion of the domain wrt to the whole integration box
-
+bg_weight <- sum(background_marks > 0) / length(background_marks)
 
 # get mean effect of g_fun and h_fun over the entire time and space
 # multiply through with all constants
@@ -269,7 +252,7 @@ rho_at_all_no_theta <- foreach(i = 1:nrow(da)) %dopar% trigger_int_fun(da, time_
                                                                       background_basex, 
                                                                       background_basey, 
                                                                       background_marks, 
-                                                                      TT * ra * bg_weight,    #### What is bg_weight doing there?
+                                                                      TT * ra * bg_weight,
                                                                       i = i)
 # reduce by event type
 rho_at_all_no_theta <- unlist(map(event_types, function(x) reduce(rho_at_all_no_theta[da$e_type == x], sum)))
@@ -286,8 +269,8 @@ neg_loglik <- function(x){
   theta <- x[-1]^2
   
   lambda_at_events <- mu0 * bg_at_events_no_mu + reduce(map2(rho_at_events_no_theta, theta, 
-                                                             `*`),  # this multiplies the triggering effect by its weights
-                                                        `+`) # and this adds them together
+                                                             `*`),
+                                                        `+`)
   
   lambda_at_all <- mu0 * bg_at_all_no_mu + reduce(map2(rho_at_all_no_theta, theta, 
                                                        `*`), 
@@ -297,7 +280,7 @@ neg_loglik <- function(x){
 }
 
 # update mu0 and A
-res <- optim(par = sqrt(c(mu0, theta)), neg_loglik)                             #### We are not using the gradients at all and we could be doing?
+res <- optim(par = sqrt(c(mu0, theta)), neg_loglik)
 
 mu0 <- res$par[1]^2
 theta <- res$par[-1]^2
@@ -312,7 +295,7 @@ lambda_at_all <- mu0 * bg_at_all_no_mu + reduce(map2(rho_at_all_no_theta, theta,
                                                 `+`)
 
 # calculate bg_probs (phi_i)
-bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events                         #### this is what they call phi_i in the paper
+bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events
 
 # PRE-CALCULATION -------------------------------------------------------------
 
@@ -340,7 +323,7 @@ dis <- data.frame(x = da$coorx[ij$i] - da$coorx[ij$j],
 # spatial offset (x, y) is observed"
 
 # for each event time, count how many other event times are in the vicinity
-g_rep <- reduce(map(da$days, function(x) as.numeric(g_base < TT - x)), `+`) # this counts the number of time points on the grid after time x.
+g_rep <- reduce(map(da$days, function(x) as.numeric(g_base < TT - x)), `+`)
 g_rep_fun <- approxfun(g_base, g_rep, yleft=1, yright=1)
 
 # set up an empty matrix
@@ -379,9 +362,8 @@ h_rep_value <- h_rep_fun(da$coorx[ij$i] - da$coorx[ij$j],
                          da$coory[ij$i] - da$coory[ij$j])
 
 
-# TODO: a boolean map for the points whose distance is less than 2.35km from (0, 0).
-excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2) 
-                                                                                #### What does this do? Where is the constant 2.35 from? Use sparse?
+# a boolean map for the points whose distance is less than 2.35km from (0, 0).
+excite.spatial.mark2 <- ((h_base_x %o% rep(1, d))^2 + (rep(1, d) %o% h_base_y)^2 < 2.35^2)
 
 # INFERENCE LOOP --------------------------------------------------------------
 k <- 1L
@@ -394,7 +376,7 @@ while (k < 40){
   # calculate w_i_t
   wi_trend <- trend_fun(da$days[da$e_type == 0]) * background_fun(da$coorx[da$e_type == 0], 
                                                                 da$coory[da$e_type == 0]) / lambda_at_events
-                                                                                #### background_fun is the mu_spatial
+
   # calculate w_i_d
   wi_daily <- daily_fun(da$days[da$e_type == 0]) * background_fun(da$coorx[da$e_type == 0], 
                                                                 da$coory[da$e_type == 0]) / lambda_at_events

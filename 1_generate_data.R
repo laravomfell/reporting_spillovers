@@ -1,5 +1,5 @@
-# In this file, we generate some fake data on a circle bounded by [0,1] to show the data 
-                                        # structure and how our model works
+# In this file, we generate some fake data on a circle bounded to show the data 
+# structure and how our model works
 
 
 # helper function
@@ -16,18 +16,21 @@ n_initial <- floor(n * 0.7)
 # generate initial events
 shp <- st_as_sf(w)
 boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-# Introduce weekly and daily periodicity using sine() function
-lbda <- function(x,y,t,a){a*(2 + sin(((2 * pi) / 7) * t) + 2 + sin(2 * pi * t))}
-cluster_process_sim <- rpcp(s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
-                            nparents=floor(parents_proportion*n_initial), npoints=n_initial,
-                            cluster=c("normal", "exponential"),
-                            dispersion=c(0.3, 10), lambda=lbda,
-                            a=100000)
 
-# animation(cluster_process_sim$xyt, s.region=cluster_process_sim$s.region, t.region=cluster_process_sim$t.region,
-#           runtime=20)
-
-
+if (parents_proportion > 0.999) {
+    print("Using homogeneous Poisson to generate the initial events.")
+    cluster_process_sim <- rpp(1, s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
+                               npoints=n_initial, replace=TRUE, discrete.time=FALSE)
+} else {
+    print("Using a clustering process to generate the initial events.")
+    lbda <- function(x,y,t,a){a*(2 + sin(((2 * pi) / 7) * t) + 2 + sin(2 * pi * t))}
+    cluster_process_sim <- rpcp(s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
+                                nparents=floor(parents_proportion*n_initial), npoints=n_initial,
+                                cluster=c("normal", "exponential"),
+                                dispersion=c(0.3, 10), lambda=lbda,
+                                a=100000)  
+}
+# animation(cluster_process_sim$xyt, s.region=cluster_process_sim$s.region, t.region=cluster_process_sim$t.region, runtime=20)
 # plot(cluster_process_sim$xyt, style="elegant")
 
 initial <- data.table(
@@ -55,8 +58,6 @@ followup[, e_type := 1L]
 
 
 # Allow follow-up to create new first-time events (e_type=0).
-                                        # Percentage of follow-up creating a new report is set to 5%
-followup_trig_prob <- 0.05
 triggered_by_follow_up <- followup[sample(nrow(followup),
                                           size = floor(followup_trig_prob * nrow(followup)),
                                           replace=T),]
@@ -75,7 +76,6 @@ triggered_by_follow_up <- triggered_by_follow_up[as.numeric(st_intersects(points
 
 # change e_type to triggered_by_follow_up
 triggered_by_follow_up[, e_type := 0L]
-
 
 da <- rbind(initial, followup, triggered_by_follow_up)
 setorder(da, datetime_unif)
