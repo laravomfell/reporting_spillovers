@@ -19,7 +19,7 @@ lambda_at_all_locations <- mu0 * bg_at_all_locations + reduce(map2(trigger_at_al
 # creating the diagonal plot
 n_events <- nrow(da[da$e_type == 0,])
 
-fit <- data.frame(y = cumsum(lambda_at_all_locations) * space_units,
+fit <- data.frame(y = cumsum(lambda_at_all_locations) * (time_marks[2] - time_marks[1]),
                   x = stepfun(da$days[da$e_type == 0], 0:n_events)(time_marks))
 p <- ggplot(fit,
        aes(x,y)) + 
@@ -45,7 +45,6 @@ ggsave(paste0("figures/", experiment_id, "_trans_time.pdf"), plot = p, width = 3
 conf <- data.frame(x = 0:n_events, y = 0,
                    ymax = n_events * qbeta(.975, 0:n_events + 1, n_events - (0:n_events) + 1),
                    ymin = n_events * qbeta(.025, 0:n_events + 1, n_events - (0:n_events) + 1))
-
 fit$dev <- fit$y - fit$x
 
 p <- ggplot(fit, aes(y, dev)) + 

@@ -120,19 +120,19 @@ option_list = list(
                 help="End date.", metavar="character"),
     make_option("--follow_trig_prob", type="numeric", default=0.0,
                 help="Percentage of the triggered events that generate follow up events."),
-    make_option(c("-i", "--experimentid"), type="character", default="uniform_bg_experiment",
+    make_option(c("-i", "--experimentid"), type="character", default="test_homogeneous",
                 help="Experiment name for easier identification of files and results.", metavar="character"),
     make_option(c("--parents_proportion"), type="numeric", default=1.0,
                 help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events."),
-    make_option("--bw_daily", type="numeric", default=0.5/24.0,
+    make_option("--bw_daily", type="numeric", default=1/24.0,
                 help="Bandwidth [in days] for the daily component of the background."),
-    make_option("--bw_weekly", type="numeric", default=4/24.0,
+    make_option("--bw_weekly", type="numeric", default=8/24.0,
                 help="Bandwidth [in days] for the weekly component of the background."),
-    make_option("--bw_trend", type="numeric", default=10,
+    make_option("--bw_trend", type="numeric", default=20,
                 help="Bandwidth [in days] for the trend component of the background."),
     make_option("--bw_g", type="numeric", default=3.0,
                 help="Bandwidth [in days] for the g(t) estimation."),
-    make_option("--bw_h", type="numeric", default=1.0,
+    make_option("--bw_h", type="numeric", default=1.5,
                 help="Bandwidth [in km] for the h(s) estimation.")
 );
 
@@ -151,7 +151,6 @@ parents_proportion <- opt$parents_proportion
 bw_daily <- opt$bw_daily
 bw_weekly <- opt$bw_weekly
 bw_trend <- opt$bw_trend
-
 bw_g <- opt$bw_g
 bw_h <- opt$bw_h
 

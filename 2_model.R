@@ -565,7 +565,7 @@ while (k < 40){
   
   # terminate or loop back
   conv <- abs(mu0 - old_mu0) < tol & all(abs(theta - old_theta) < tol)
-  if (conv){
+  if (conv & k > 10){
     break
   }
 
