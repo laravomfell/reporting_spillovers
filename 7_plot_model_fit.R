@@ -46,7 +46,6 @@ conf <- data.frame(x = 0:n_events, y = 0,
                    ymax = n_events * qbeta(.975, 0:n_events + 1, n_events - (0:n_events) + 1),
                    ymin = n_events * qbeta(.025, 0:n_events + 1, n_events - (0:n_events) + 1))
 fit$dev <- fit$y - fit$x
-
 p <- ggplot(fit, aes(y, dev)) + 
   geom_ribbon(data = conf,
               aes(x, ymin = ymin -x, ymax = ymax -x, y=y),inherit.aes = F, fill = "#d6d6d6") +

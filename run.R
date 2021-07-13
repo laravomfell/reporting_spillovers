@@ -130,9 +130,9 @@ option_list = list(
                 help="Bandwidth [in days] for the weekly component of the background."),
     make_option("--bw_trend", type="numeric", default=20,
                 help="Bandwidth [in days] for the trend component of the background."),
-    make_option("--bw_g", type="numeric", default=3.0,
+    make_option("--bw_g", type="numeric", default=1.0,
                 help="Bandwidth [in days] for the g(t) estimation."),
-    make_option("--bw_h", type="numeric", default=1.5,
+    make_option("--bw_h", type="numeric", default=0.2,
                 help="Bandwidth [in km] for the h(s) estimation.")
 );
 
