@@ -37,7 +37,6 @@ p <- ggplot(fit,
   theme(panel.grid = element_blank(),
         axis.text = element_text(size = 9)) +
     labs(x = "Event index", y = "Cumulative frequency")
-p
 
 ggsave(paste0("figures/", experiment_id, "_trans_time.pdf"), plot = p, width = 3.5, height = 3.5)
 
@@ -54,6 +53,53 @@ p <- ggplot(fit, aes(y, dev)) +
   scale_y_continuous(breaks = c(-50,-25,0,25,50)) +
   geom_line(color = "#721F81FF") +
     labs(x = "Event index", y = parse(text = "Predicted~-~expected~number~of~events"))
-p
 
 ggsave(paste0("figures/", experiment_id, "_dev.pdf"), plot = p, width = 5.5, height = 3.5)
+
+
+
+
+##
+##
+## Voronoi diagnostics
+##
+##
+voronoi_num_samples <- 5
+
+initial_events_sf <- st_as_sf(da[da$e_type == 0,], coords = c("coorx", "coory"))
+
+voronoi_polygons <- st_as_sf(st_intersection(st_cast(st_voronoi(st_union(initial_events_sf))), st_union(shp)))
+voronoi_polygons$expected_count <- 0
+
+for (cell_i in 1:nrow(voronoi_polygons)) {
+    points_in_cell <- st_sample(voronoi_polygons[cell_i, ], size=voronoi_num_samples)
+
+    # Evaluate the lambda at those locations.
+    # TODO:
+
+    # Average over the values of lambda.
+    # TODO:
+
+    # Store the value in the dataframe for the corresponding Voronoi cell.
+    voronoi_polygons[cell_i, 'expected_count'] <- 1.0
+}
+plot(voronoi_polygons)
+
+
+
+helper_func <- function(a, x, y, i) {
+    g_fun(time_marks - a$days[i]) * h_fun(x - a$coorx[i], y - a$coory[i])
+}
+
+lambda_at_loc <- function(x, y) {
+    time_integral_bg <- mean(trend_fun(time_marks) * weekly_fun(time_marks) * daily_fun(time_marks)) * TT
+
+    trig_part_no_theta <- foreach(i = 1:nrow(da)) %dopar% helper_func(da, x, y, i)
+    trig_part_no_theta <- map(event_types,
+                              function(x) reduce(trig_part_no_theta[da$e_type == x], `+`))
+    output <- mu0 * background_fun(x, y) * time_integral_bg + reduce(map2(trig_part_no_theta, theta, `*`),
+                                                                     `+`)
+    return(output)
+}
+
+lambda_at_loc(0, 0)
