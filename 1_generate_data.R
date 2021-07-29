@@ -25,7 +25,7 @@ if (parents_proportion > 0.999) {
     print("Using a clustering process to generate the initial events.")
     lbda <- function(x,y,t,a){a*(2 + sin(((2 * pi) / 7) * t) + 2 + sin(2 * pi * t))}
     cluster_process_sim <- rpcp(s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
-                                nparents=floor(parents_proportion*n_initial), npoints=n_initial,
+                                nparents=floor(parents_proportion*n_initial), npoints=n_initial, infectious=TRUE,
                                 cluster=c("normal", "exponential"),
                                 dispersion=c(0.3, 10), lambda=lbda,
                                 a=100000)  
