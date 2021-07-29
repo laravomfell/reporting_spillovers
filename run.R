@@ -44,7 +44,7 @@ gpclibPermit()
 library(foreach)
 library(doParallel)
 no_cores <- parallel::detectCores()
-cl <- makeCluster(no_cores/2)
+cl <- makeCluster(no_cores)
 registerDoParallel(cl)
 
 # A few plot settings
@@ -110,7 +110,9 @@ default_end_date <- "2018-12-31"
 
 option_list = list(
     make_option("--regenerate", action="store_true", default=FALSE),
-    make_option(c("-n", "--numsmooth"), type="integer", default=3, 
+    make_option("--snapshot", action="store_true", default=FALSE),
+    make_option("--voronoi", action="store_true", default=FALSE),
+    make_option(c("-n", "--numsmooth"), type="integer", default=10, 
                 help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
     make_option("--allevents", type="integer", default=2000,
                 help="Number of all events, [default= %default]", metavar="integer"),
@@ -118,7 +120,7 @@ option_list = list(
                 help="Start date.", metavar="character"),
     make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
                 help="End date.", metavar="character"),
-    make_option("--follow_trig_prob", type="numeric", default=0.0,
+    make_option("--follow_trig_prob", type="numeric", default=0.00,
                 help="Percentage of the triggered events that generate follow up events."),
     make_option(c("-i", "--experimentid"), type="character", default="test_homogeneous",
                 help="Experiment name for easier identification of files and results.", metavar="character"),
@@ -132,7 +134,7 @@ option_list = list(
                 help="Bandwidth [in days] for the trend component of the background."),
     make_option("--bw_g", type="numeric", default=1.0,
                 help="Bandwidth [in days] for the g(t) estimation."),
-    make_option("--bw_h", type="numeric", default=0.2,
+    make_option("--bw_h", type="numeric", default=0.4,
                 help="Bandwidth [in km] for the h(s) estimation.")
 );
 
@@ -140,6 +142,8 @@ opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
 regen_data <- opt$regenerate
+save_snapshot <- opt$snapshot
+compute_voronoi <- opt$voronoi
 n_p <- opt$numsmooth
 start_date <- as.POSIXct(opt$startdate)
 end_date <- as.POSIXct(opt$enddate)
@@ -164,17 +168,26 @@ experiment_id <- paste0(opt$experimentid,
                         "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                         "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
                         "_parents_proportion_", gsub('\\.', '_', parents_proportion))
+print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
+
+                                        # Synthetic data generation ---------------------------------------------------
+gen_data_id <- paste0(opt$experimentid,
+                      "_numevents_", num_all_events,
+                      "_np_", n_p,
+                      "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
+                      "_parents_proportion_", gsub('\\.', '_', parents_proportion))
+gen_data_fname <- paste0("da_", gen_data_id, ".csv")
+print(paste0(">>>>>> DATA FILE NAME: ", gen_data_fname))
 
 
-print(experiment_id)
 
-# Synthetic data generation ---------------------------------------------------
-if (regen_data) {
+
+if (file.exists(gen_data_fname) & !regen_data) {
+    da <- fread(file = gen_data_fname)
+} else {
     print("Regenerating synthetic data.")
     library(stpp)
     source("1_generate_data.R")
-} else {
-    da <- fread(file = paste0("da_", experiment_id, ".csv"))
 }
 
 # Running the model -----------------------------------------------------------

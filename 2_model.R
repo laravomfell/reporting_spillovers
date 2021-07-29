@@ -62,8 +62,8 @@ time_marks <- seq(0, TT, 1/(TT/3.65))
 
 # maximum trigger ranges allowed
 # 30 days and 2km
-max_t <- 30
-max_s <- 2
+max_t <- 40
+max_s <- 3
 
 # at which resolution are we looking into triggering?
 # 50m and ~7.5 min
@@ -153,21 +153,23 @@ background_basevalue <- as(matrix(0,
 # write sparse matrix for each event
 make_bg_smoothers <- function(i){
   # set file name
-  fn <- paste0("background_smoothers/", experiment_id, "_bgsmoother_", i, ".mtx")
-  
-  # for each location on the grid, add density of each event
-  bgsmoother <- (dnorm(background_basex, 
-                       da$coorx[i],
-                       da$bandwidth[i]) * 
-                   dnorm(background_basey,
-                         da$coory[i], 
-                         da$bandwidth[i]) /
-                   da$bg_integral[i])
-  # coerce values that are basically zero to be actually zero
-  bgsmoother[bgsmoother < 0.001] <- 0
-  # write as sparse matrix
-  bgsmoother <- Matrix::Matrix(bgsmoother, sparse = T)
-  Matrix::writeMM(bgsmoother, fn)
+    fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
+
+    if(!file.exists(fn)) {
+        ## for each location on the grid, add density of each event
+        bgsmoother <- (dnorm(background_basex, 
+                             da$coorx[i],
+                             da$bandwidth[i]) * 
+                       dnorm(background_basey,
+                             da$coory[i], 
+                             da$bandwidth[i]) /
+                       da$bg_integral[i])
+                                        # coerce values that are basically zero to be actually zero
+        bgsmoother[bgsmoother < 0.001] <- 0
+                                        # write as sparse matrix
+        bgsmoother <- Matrix::Matrix(bgsmoother, sparse = T)
+        Matrix::writeMM(bgsmoother, fn)
+    }
 }
 
 # execute
@@ -177,7 +179,7 @@ foreach(i = which(da$e_type == 0)) %dopar% make_bg_smoothers(i)
 for (i in which(da$e_type == 0)){
   if (i %% 500 == 0) print(paste("on:", i))
   
-  fn <- paste0("background_smoothers/", experiment_id, "_bgsmoother_", i, ".mtx")
+  fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
   bgsmoother <- readMM(fn)
   
   background_basevalue <- background_basevalue + bgsmoother
@@ -416,7 +418,7 @@ while (k < 40){
   # read every single event density in again
   for(i in which(da$e_type == 0)){
     if (i %% 500 == 0) print(paste("on bgsmoother:", i))
-    fn <- paste0("background_smoothers/", experiment_id, "_bgsmoother_", i, ".mtx")
+    fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
     bgsmoother <- readMM(fn)
     background_basevalue <- background_basevalue + bg_probs[id[i]] * bgsmoother
   }
@@ -588,4 +590,6 @@ write(theta, file = paste0("results/inferred_params", experiment_id, ".out"),
 write(res$value, file = paste0("results/inferred_params", experiment_id, ".out"),
       append = TRUE)
 
-
+if (save_snapshot) {
+    save.image(file=paste0("results/snapshot_", experiment_id, ".RData"))
+}
