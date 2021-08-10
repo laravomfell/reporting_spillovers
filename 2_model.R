@@ -32,30 +32,21 @@
 
 # SETUP --------------------------------------------------------
 
+# range of area
+
+x_range <- c(min(boundary$x), max(boundary$x))
+y_range <- c(min(boundary$y), max(boundary$y))
+
+ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
+
+# TT = length of the time interval
+TT <- ceiling(max(da$days))
+
 event_types <- purrr::set_names(unique(da$e_type))
 # since not all events are outcome events, we need a lookup vector
 id <- 1:nrow(da)
 id[da$e_type == 1] <- NA_integer_
 id[!is.na(id)] <- 1:sum(!is.na(id))
-
-# inpoly needs list to boundary coordinates
-shp <- st_as_sf(w)
-shp_area <- st_area(shp)
-
-# extract boundaries
-bbox <- st_bbox(shp)
-
-boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-
-# range of coordinates
-x_range <- c(bbox["xmin"], bbox["xmax"])
-y_range <- c(bbox["ymin"], bbox["ymax"])
-
-# range of area
-ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
-
-# TT = length of the time interval
-TT <- ceiling(max(da$days))
 
 # time stamps spaced out as 1/100 days (= 14min)
 time_marks <- seq(0, TT, 1/(TT/3.65))
@@ -97,8 +88,8 @@ weekly_base <- seq(0, 7, time_units)
 week_marks <- da$days[da$e_type == 0] - as.integer(da$days[da$e_type == 0] / 7) * 7 
 
 week_weights <- 1 / (as.integer(TT/7) + 
-                     (da$days[da$e_type == 0] - 
-                     as.integer(da$days[da$e_type == 0] / 7) * 7 > TT - as.integer(TT / 7) * 7)) 
+                       (da$days[da$e_type == 0] - 
+                          as.integer(da$days[da$e_type == 0] / 7) * 7 > TT - as.integer(TT / 7) * 7)) 
 
 # as before, get intensity at points throughout the week
 temp <- hist.weighted(week_marks, week_weights, breaks = weekly_base)
@@ -114,8 +105,8 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # time marks is the variable 'x'. Here we are applying the kernel to prevent the leakage.
 raw_trend_basevalue <- map(da$days[da$e_type == 0],
                            function(x) dnorm(x - time_marks, 0, bw_trend) + 
-                                       dnorm(x + time_marks, 0, bw_trend) +
-                                       dnorm(x + 2 * TT - time_marks, TT, bw_trend))
+                             dnorm(x + time_marks, 0, bw_trend) +
+                             dnorm(x + 2 * TT - time_marks, TT, bw_trend))
 
 trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
@@ -153,23 +144,23 @@ background_basevalue <- as(matrix(0,
 # write sparse matrix for each event
 make_bg_smoothers <- function(i){
   # set file name
-    fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
-
-    if(!file.exists(fn)) {
-        ## for each location on the grid, add density of each event
-        bgsmoother <- (dnorm(background_basex, 
-                             da$coorx[i],
-                             da$bandwidth[i]) * 
-                       dnorm(background_basey,
-                             da$coory[i], 
-                             da$bandwidth[i]) /
-                       da$bg_integral[i])
-                                        # coerce values that are basically zero to be actually zero
-        bgsmoother[bgsmoother < 0.001] <- 0
-                                        # write as sparse matrix
-        bgsmoother <- Matrix::Matrix(bgsmoother, sparse = T)
-        Matrix::writeMM(bgsmoother, fn)
-    }
+  fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
+  
+  if(!file.exists(fn)) {
+    ## for each location on the grid, add density of each event
+    bgsmoother <- (dnorm(background_basex, 
+                         da$coorx[i],
+                         da$bandwidth[i]) * 
+                     dnorm(background_basey,
+                           da$coory[i], 
+                           da$bandwidth[i]) /
+                     da$bg_integral[i])
+    # coerce values that are basically zero to be actually zero
+    bgsmoother[bgsmoother < 0.001] <- 0
+    # write as sparse matrix
+    bgsmoother <- Matrix::Matrix(bgsmoother, sparse = T)
+    Matrix::writeMM(bgsmoother, fn)
+  }
 }
 
 # execute
@@ -184,14 +175,22 @@ for (i in which(da$e_type == 0)){
   
   background_basevalue <- background_basevalue + bgsmoother
 }
-  
+
 # standardize the background so its average inside the study window is 1
 background_basevalue <- background_basevalue / mean(background_basevalue[as.vector(background_marks > 0)])
 
 
 # 5. initialize temporal triggering kernel
 g_base <- seq(0, max_t, time_units)
-g_basevalue <- (1/24 + g_base/24)^(-1)
+
+if (g_init_delay_flag) {
+  # with delay as per Gilmour (2019). It peaks at 15 days approximately.
+  g_delay_param <- 0.067 # approximately equal to (1 / 15)
+  g_basevalue <- (g_delay_param^2)* t * e^(-g_delay_param * t)
+} else {
+  # without delay
+  g_basevalue <- (1/24 + g_base/24)^(-1)
+}
 
 # we normalize by the integral over the entire time window
 g_basevalue <- g_basevalue / simpson(g_basevalue, time_units)
@@ -218,30 +217,30 @@ source("interpolate_fun.R")
 
 # evaluate background at all events (only the main events, not follow-ups)
 bg_at_events_no_mu <- (trend_fun(da$days[da$e_type == 0]) * 
-                       weekly_fun(da$days[da$e_type == 0]) * 
-                       daily_fun(da$days[da$e_type == 0]) *
-                       background_fun(da$coorx[da$e_type == 0], 
-                                      da$coory[da$e_type == 0]))
+                         weekly_fun(da$days[da$e_type == 0]) * 
+                         daily_fun(da$days[da$e_type == 0]) *
+                         background_fun(da$coorx[da$e_type == 0], 
+                                        da$coory[da$e_type == 0]))
 
 # integral of background
 bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
-                         weekly_fun(time_marks) * 
-                         daily_fun(time_marks)) * 
-                    TT *
-                    mean(background_fun(background_basex,
-                                        background_basey) * 
-                         background_marks) *
-                    ra)
+                           weekly_fun(time_marks) * 
+                           daily_fun(time_marks)) * 
+                      TT *
+                      mean(background_fun(background_basex,
+                                          background_basey) * 
+                             background_marks) *
+                      ra)
 
 # 7. trigger
 
 # at events, for both event types
 rho_at_events_no_theta <- foreach(i = 1:nrow(da)) %dopar% trigger_fun(a = da, i = i)
-  
+
 # simplify
 rho_at_events_no_theta <- map(event_types, 
                               function(x) reduce(rho_at_events_no_theta[da$e_type == x], `+`))
-  
+
 # integral of trigger (this operation takes approx 1.5h on our full dataset bc we need to evaluate
 # h_fun repeatedly over the entire grid)
 
@@ -251,11 +250,11 @@ bg_weight <- sum(background_marks > 0) / length(background_marks)
 # get mean effect of g_fun and h_fun over the entire time and space
 # multiply through with all constants
 rho_at_all_no_theta <- foreach(i = 1:nrow(da)) %dopar% trigger_int_fun(da, time_marks, 
-                                                                      background_basex, 
-                                                                      background_basey, 
-                                                                      background_marks, 
-                                                                      TT * ra * bg_weight,
-                                                                      i = i)
+                                                                       background_basex, 
+                                                                       background_basey, 
+                                                                       background_marks, 
+                                                                       TT * ra * bg_weight,
+                                                                       i = i)
 # reduce by event type
 rho_at_all_no_theta <- unlist(map(event_types, function(x) reduce(rho_at_all_no_theta[da$e_type == x], sum)))
 
@@ -311,9 +310,9 @@ bg_probs <- mu0 * bg_at_events_no_mu / lambda_at_events
 ij <- expand.grid(i = which(da$e_type == 0), j = 1:nrow(da))
 
 ij <- ij[da$days[ij$i] > da$days[ij$j] &
-         da$days[ij$i] < da$days[ij$j] + max_t &
-         abs(da$coorx[ij$i] - da$coorx[ij$j]) < max_s &
-         abs(da$coory[ij$i] - da$coory[ij$j]) < max_s,]
+           da$days[ij$i] < da$days[ij$j] + max_t &
+           abs(da$coorx[ij$i] - da$coorx[ij$j]) < max_s &
+           abs(da$coory[ij$i] - da$coory[ij$j]) < max_s,]
 
 # get distance between (i,j)
 dis <- data.frame(x = da$coorx[ij$i] - da$coorx[ij$j], 
@@ -332,21 +331,21 @@ g_rep_fun <- approxfun(g_base, g_rep, yleft=1, yright=1)
 h_rep <- matrix(0L, 
                 ncol = length(h_base_x),
                 nrow = length(h_base_y))
-  
+
 # this gives for each grid cell the number of events that can 'reach' this cell in terms of triggering.
 for(i in 1:nrow(da)){
   fn <- paste0("h_space_marks/", experiment_id, "_h_marks_", i, ".csv")
   
   h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + da$coorx[i],
-                                 rep(1, d) %o% h_base_y + da$coory[i],
-                                 boundary$X,
-                                 boundary$Y) >= 0,
-                          ncol = d)
+                               rep(1, d) %o% h_base_y + da$coory[i],
+                               boundary$X,
+                               boundary$Y) >= 0,
+                        ncol = d)
   idx <- which(h_mark_temp == FALSE)
   # no need to write anything if all values are TRUE
   if (length(idx) == 0) next
   fwrite(data.table(idx), file = fn)
-
+  
   h_rep <- h_rep + h_mark_temp
 }
 
@@ -377,15 +376,15 @@ while (k < 40){
   # get weights wi_daily, wi_weekly, wi_trend, wi_bg
   # calculate w_i_t
   wi_trend <- trend_fun(da$days[da$e_type == 0]) * background_fun(da$coorx[da$e_type == 0], 
-                                                                da$coory[da$e_type == 0]) / lambda_at_events
-
+                                                                  da$coory[da$e_type == 0]) / lambda_at_events
+  
   # calculate w_i_d
   wi_daily <- daily_fun(da$days[da$e_type == 0]) * background_fun(da$coorx[da$e_type == 0], 
-                                                                da$coory[da$e_type == 0]) / lambda_at_events
+                                                                  da$coory[da$e_type == 0]) / lambda_at_events
   
   # calculate w_i_w
   wi_weekly <- weekly_fun(da$days[da$e_type == 0]) * background_fun(da$coorx[da$e_type == 0], 
-                                                                  da$coory[da$e_type == 0]) / lambda_at_events
+                                                                    da$coory[da$e_type == 0]) / lambda_at_events
   
   # use those to get mu_daily, mu_weekly, mu_trend, mu_bg
   
@@ -402,7 +401,7 @@ while (k < 40){
   weekly_basevalue <- ker.smooth.fft(temp$mids, temp$density, bw_weekly)
   # standardize
   weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
-
+  
   # mu_trend: update intensity estimates with new weights
   trend_basevalue <- map2(raw_trend_basevalue, wi_trend, `*`)
   trend_basevalue <- reduce(trend_basevalue, `+`)
@@ -457,16 +456,16 @@ while (k < 40){
   
   # evaluate triggering function * theta
   wi_gh <- theta[da$e_type[ij$j] + 1] * 
-           g_fun(da$days[ij$i] - da$days[ij$j]) * 
-           h_fun(da$coorx[ij$i] - da$coorx[ij$j],
-                 da$coory[ij$i] - da$coory[ij$j]) /
-           lambda_at_events[id[ij$i]]
+    g_fun(da$days[ij$i] - da$days[ij$j]) * 
+    h_fun(da$coorx[ij$i] - da$coorx[ij$j],
+          da$coory[ij$i] - da$coory[ij$j]) /
+    lambda_at_events[id[ij$i]]
   
   # correct wi_gh by g_edge and g_rep for g(t) update
   g_temp <- hist.weighted(da$days[ij$i] - da$days[ij$j],
                           wi_gh / 
-                          (g_edge_correction[ij$j] *
-                           g_rep_fun(da$days[ij$i] - da$days[ij$j])),
+                            (g_edge_correction[ij$j] *
+                               g_rep_fun(da$days[ij$i] - da$days[ij$j])),
                           breaks = g_base)
   
   # update g(t)
@@ -501,10 +500,10 @@ while (k < 40){
   source("interpolate_fun.R")
   # evaluate background at all events
   bg_at_events_no_mu <- (trend_fun(da$days[da$e_type == 0]) * 
-                         weekly_fun(da$days[da$e_type == 0]) * 
-                         daily_fun(da$days[da$e_type == 0]) *
-                         background_fun(da$coorx[da$e_type == 0], 
-                                        da$coory[da$e_type == 0]))
+                           weekly_fun(da$days[da$e_type == 0]) * 
+                           daily_fun(da$days[da$e_type == 0]) *
+                           background_fun(da$coorx[da$e_type == 0], 
+                                          da$coory[da$e_type == 0]))
   
   # integral of background over entire space
   bg_at_all_no_mu <- (mean(trend_fun(time_marks) * 
@@ -529,11 +528,11 @@ while (k < 40){
   # get mean effect of g_fun and h_fun over the entire time and space
   # multiply through with all constants
   rho_at_all_no_theta <- foreach(i = 1:nrow(da)) %dopar% trigger_int_fun(da, time_marks, 
-                                                                    background_basex, 
-                                                                    background_basey, 
-                                                                    background_marks, 
-                                                                    TT * ra * bg_weight, 
-                                                                    i = i)
+                                                                         background_basex, 
+                                                                         background_basey, 
+                                                                         background_marks, 
+                                                                         TT * ra * bg_weight, 
+                                                                         i = i)
   # reduce by event type
   rho_at_all_no_theta <- unlist(map(event_types, function(x) reduce(rho_at_all_no_theta[da$e_type == x], sum)))
   
@@ -570,7 +569,7 @@ while (k < 40){
   if (conv & k > 10){
     break
   }
-
+  
   
   k <- k + 1L
   invisible(gc())
@@ -591,5 +590,5 @@ write(res$value, file = paste0("results/inferred_params", experiment_id, ".out")
       append = TRUE)
 
 if (save_snapshot) {
-    save.image(file=paste0("results/snapshot_", experiment_id, ".RData"))
+  save.image(file=paste0("results/snapshot_", experiment_id, ".RData"))
 }

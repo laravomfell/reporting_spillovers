@@ -13,10 +13,6 @@ set.seed(42)
 n <- num_all_events
 n_initial <- floor(n * 0.7)
 
-# generate initial events
-shp <- st_as_sf(w)
-boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-
 if (parents_proportion > 0.999) {
     print("Using homogeneous Poisson to generate the initial events.")
     cluster_process_sim <- rpp(1, s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),

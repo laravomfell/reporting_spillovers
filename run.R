@@ -26,6 +26,7 @@
 # Preliminaries ---------------------------------------------------------------
 
 # required libraries
+library(tictoc)
 library(spatstat)
 library(purrr)
 library(Matrix)
@@ -88,19 +89,9 @@ system("mkdir h_space_marks")
 system("mkdir figures")
 system("mkdir results")
 
-# here we would normally load our shapefile, but instead we use the generated circle
-# create circle with radius 9.3km which given an area similaro to the area we study.
-angle_increments <- 2 * pi / 1000
-# create angles
-ang <- seq(0, 2 * pi - angle_increments, by = angle_increments)
-circ <- data.frame(x = 9.3 + 9.3 * cos(ang),
-                   y = 9.3 + 9.3 * sin(ang))
-w <- owin(poly = circ)
-
 ###############################################################################
 #                                  MAIN PART                                  #
 ###############################################################################
-
 default_start_date <- "2018-01-01"
 default_end_date <- "2018-12-31"
 
@@ -109,86 +100,137 @@ default_end_date <- "2018-12-31"
 ###############################################################################
 
 option_list = list(
-    make_option("--regenerate", action="store_true", default=FALSE),
-    make_option("--snapshot", action="store_true", default=FALSE),
-    make_option("--voronoi", action="store_true", default=FALSE),
-    make_option(c("-n", "--numsmooth"), type="integer", default=10, 
-                help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
-    make_option("--allevents", type="integer", default=2000,
-                help="Number of all events, [default= %default]", metavar="integer"),
-    make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
-                help="Start date.", metavar="character"),
-    make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
-                help="End date.", metavar="character"),
-    make_option("--follow_trig_prob", type="numeric", default=0.00,
-                help="Percentage of the triggered events that generate follow up events."),
-    make_option(c("-i", "--experimentid"), type="character", default="test_homogeneous",
-                help="Experiment name for easier identification of files and results.", metavar="character"),
-    make_option(c("--parents_proportion"), type="numeric", default=1.0,
-                help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events."),
-    make_option("--bw_daily", type="numeric", default=1/24.0,
-                help="Bandwidth [in days] for the daily component of the background."),
-    make_option("--bw_weekly", type="numeric", default=8/24.0,
-                help="Bandwidth [in days] for the weekly component of the background."),
-    make_option("--bw_trend", type="numeric", default=20,
-                help="Bandwidth [in days] for the trend component of the background."),
-    make_option("--bw_g", type="numeric", default=1.0,
-                help="Bandwidth [in days] for the g(t) estimation."),
-    make_option("--bw_h", type="numeric", default=0.4,
-                help="Bandwidth [in km] for the h(s) estimation.")
+  make_option("--real_data", action="store_true", default=FALSE),
+  make_option("--regenerate", action="store_true", default=FALSE),
+  make_option("--snapshot", action="store_true", default=FALSE),
+  make_option("--voronoi", action="store_true", default=FALSE),
+  make_option("--g_delay", action="store_true", default=FALSE),
+  make_option(c("-n", "--numsmooth"), type="integer", default=10, 
+              help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
+  make_option("--allevents", type="integer", default=2000,
+              help="Number of all events, [default= %default]", metavar="integer"),
+  make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
+              help="Start date.", metavar="character"),
+  make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
+              help="End date.", metavar="character"),
+  make_option("--follow_trig_prob", type="numeric", default=0.00,
+              help="Percentage of the triggered events that generate follow up events."),
+  make_option(c("-i", "--experimentid"), type="character", default="test_homogeneous",
+              help="Experiment name for easier identification of files and results.", metavar="character"),
+  make_option(c("--parents_proportion"), type="numeric", default=1.0,
+              help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events."),
+  make_option("--bw_daily", type="numeric", default=1/24.0,
+              help="Bandwidth [in days] for the daily component of the background."),
+  make_option("--bw_weekly", type="numeric", default=8/24.0,
+              help="Bandwidth [in days] for the weekly component of the background."),
+  make_option("--bw_trend", type="numeric", default=20,
+              help="Bandwidth [in days] for the trend component of the background."),
+  make_option("--bw_g", type="numeric", default=1.0,
+              help="Bandwidth [in days] for the g(t) estimation."),
+  make_option("--bw_h", type="numeric", default=0.4,
+              help="Bandwidth [in km] for the h(s) estimation.")
 );
 
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
-regen_data <- opt$regenerate
-save_snapshot <- opt$snapshot
-compute_voronoi <- opt$voronoi
+
+is_real_data <- opt$real_data
+
+g_init_delay_flag <- opt$g_delay
 n_p <- opt$numsmooth
-start_date <- as.POSIXct(opt$startdate)
-end_date <- as.POSIXct(opt$enddate)
-num_all_events <- opt$allevents
-followup_trig_prob <- opt$follow_trig_prob
-parents_proportion <- opt$parents_proportion
-
-
 bw_daily <- opt$bw_daily
 bw_weekly <- opt$bw_weekly
 bw_trend <- opt$bw_trend
 bw_g <- opt$bw_g
 bw_h <- opt$bw_h
+save_snapshot <- opt$snapshot
+compute_voronoi <- opt$voronoi
 
-experiment_id <- paste0(opt$experimentid,
+if (!is_real_data) {
+  start_date <- as.POSIXct(opt$startdate)
+  end_date <- as.POSIXct(opt$enddate)
+  num_all_events <- opt$allevents
+  followup_trig_prob <- opt$follow_trig_prob
+  parents_proportion <- opt$parents_proportion
+  regen_data <- opt$regenerate
+  
+  experiment_id <- paste0("synth_",
+                          opt$experimentid,
+                          "_numevents_", num_all_events,
+                          "_np_", n_p,
+                          "_bw_daily_", format(bw_daily, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_weekly_", format(bw_weekly, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_trend_", format(bw_trend, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_g_", format(bw_g, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
+                          "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
+                          "_parents_proportion_", gsub('\\.', '_', parents_proportion),
+                          "_delay_g_", tolower(g_init_delay_flag))
+  
+  # here we would normally load our shapefile, but instead we use the generated circle
+  # create circle with radius 9.3km which given an area similar to the area we study.
+  angle_increments <- 2 * pi / 1000
+  # create angles
+  ang <- seq(0, 2 * pi - angle_increments, by = angle_increments)
+  circ <- data.frame(x = 9.3 + 9.3 * cos(ang),
+                     y = 9.3 + 9.3 * sin(ang))
+  w <- owin(poly = circ)
+  shp <- st_as_sf(w)
+  boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
+  
+  # Synthetic data generation ---------------------------------------------------
+  gen_data_id <- paste0(opt$experimentid,
                         "_numevents_", num_all_events,
                         "_np_", n_p,
-                        "_bw_daily_", format(bw_daily, nsmall=1, digits=2, decimal.mark='_'),
-                        "_bw_weekly_", format(bw_weekly, nsmall=1, digits=2, decimal.mark='_'),
-                        "_bw_trend_", format(bw_trend, nsmall=1, digits=2, decimal.mark='_'),
-                        "_bw_g_", format(bw_g, nsmall=1, digits=2, decimal.mark='_'),
-                        "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                         "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
                         "_parents_proportion_", gsub('\\.', '_', parents_proportion))
-print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
-
-                                        # Synthetic data generation ---------------------------------------------------
-gen_data_id <- paste0(opt$experimentid,
-                      "_numevents_", num_all_events,
-                      "_np_", n_p,
-                      "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
-                      "_parents_proportion_", gsub('\\.', '_', parents_proportion))
-gen_data_fname <- paste0("da_", gen_data_id, ".csv")
-print(paste0(">>>>>> DATA FILE NAME: ", gen_data_fname))
-
-
-
-
-if (file.exists(gen_data_fname) & !regen_data) {
+  gen_data_fname <- paste0("da_", gen_data_id, ".csv")
+  print(paste0(">>>>>> DATA FILE NAME: ", gen_data_fname))
+  
+  if (file.exists(gen_data_fname) & !regen_data) {
     da <- fread(file = gen_data_fname)
-} else {
+  } else {
     print("Regenerating synthetic data.")
     library(stpp)
     source("1_generate_data.R")
+  }
+  
+  # inpoly needs list to boundary coordinates
+  shp_area <- st_area(shp)
+  
+  # extract the boundary
+  bbox <- st_bbox(shp)
+  boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
+} else {
+  experiment_id <- paste0("real_", 
+                          opt$experimentid,
+                          "_np_", n_p,
+                          "_bw_daily_", format(bw_daily, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_weekly_", format(bw_weekly, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_trend_", format(bw_trend, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_g_", format(bw_g, nsmall=1, digits=2, decimal.mark='_'),
+                          "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
+                          "_delay_g_", tolower(g_init_delay_flag))
+  source("prepare_data.R")
+  da <- read.csv("da_type.csv")
+  
+  shp <- read_sf("cov.shp", crs = 27700)
+  # extract boundaries
+  bbox <- st_bbox(shp) / 1000
+  # extract precise area
+  shp_area <- units::drop_units(st_area(shp)/1000^2)
+  
+  boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
+  boundary$x <- boundary$X / 1000
+  boundary$y <- boundary$Y / 1000
+  
+  # reverse x and y for owin
+  boundary$x <- rev(boundary$x)
+  boundary$y <- rev(boundary$y)
 }
+
+print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
 
 # Running the model -----------------------------------------------------------
 source("2_model.R")
