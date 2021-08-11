@@ -34,8 +34,8 @@
 
 # range of area
 
-x_range <- c(min(boundary$x), max(boundary$x))
-y_range <- c(min(boundary$y), max(boundary$y))
+x_range <- c(min(boundary$X), max(boundary$X))
+y_range <- c(min(boundary$Y), max(boundary$Y))
 
 ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
 

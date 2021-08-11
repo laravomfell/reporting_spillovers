@@ -182,7 +182,12 @@ if (!is_real_data) {
   w <- owin(poly = circ)
   shp <- st_as_sf(w)
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
+  # inpoly needs list to boundary coordinates
+  shp_area <- st_area(shp)
   
+  # extract the boundary
+  bbox <- st_bbox(shp)
+
   # Synthetic data generation ---------------------------------------------------
   gen_data_id <- paste0(opt$experimentid,
                         "_numevents_", num_all_events,
@@ -191,7 +196,7 @@ if (!is_real_data) {
                         "_parents_proportion_", gsub('\\.', '_', parents_proportion))
   gen_data_fname <- paste0("da_", gen_data_id, ".csv")
   print(paste0(">>>>>> DATA FILE NAME: ", gen_data_fname))
-  
+
   if (file.exists(gen_data_fname) & !regen_data) {
     da <- fread(file = gen_data_fname)
   } else {
@@ -199,13 +204,6 @@ if (!is_real_data) {
     library(stpp)
     source("1_generate_data.R")
   }
-  
-  # inpoly needs list to boundary coordinates
-  shp_area <- st_area(shp)
-  
-  # extract the boundary
-  bbox <- st_bbox(shp)
-  boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
 } else {
   experiment_id <- paste0("real_", 
                           opt$experimentid,
@@ -220,18 +218,18 @@ if (!is_real_data) {
   da <- read.csv("da_type.csv")
   
   shp <- read_sf("cov.shp", crs = 27700)
-  # extract boundaries
+  # extract the boundary
   bbox <- st_bbox(shp) / 1000
   # extract precise area
   shp_area <- units::drop_units(st_area(shp)/1000^2)
   
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-  boundary$x <- boundary$X / 1000
-  boundary$y <- boundary$Y / 1000
+  boundary$X <- boundary$X / 1000
+  boundary$Y <- boundary$Y / 1000
   
   # reverse x and y for owin
-  boundary$x <- rev(boundary$x)
-  boundary$y <- rev(boundary$y)
+  boundary$X <- rev(boundary$X)
+  boundary$Y <- rev(boundary$Y)
 }
 
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
