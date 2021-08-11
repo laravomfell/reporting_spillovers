@@ -5,7 +5,6 @@
 # helper function
 dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 
-
 set.seed(42)
 
 # in our data, each event has a unique case_id, but some events are follow-ups so they belong to another case
@@ -109,4 +108,4 @@ for(i in which(da$e_type == 0)){
 # transform datestamp into 1/days units since beginning of study window
 da$days <- (unclass(da$datetime_unif) - unclass(as.POSIXct(start_date)))/24/60/60
 
-fwrite(da, file = paste0("da_", experiment_id, ".csv"), dateTimeAs = "write.csv")
+fwrite(da, file = gen_data_fname, dateTimeAs = "write.csv")
