@@ -186,7 +186,7 @@ g_base <- seq(0, max_t, time_units)
 if (g_init_delay_flag) {
   # with delay as per Gilmour (2019). It peaks at 15 days approximately.
   g_delay_param <- 0.067 # approximately equal to (1 / 15)
-  g_basevalue <- (g_delay_param^2)* t * e^(-g_delay_param * t)
+  g_basevalue <- (g_delay_param^2) * g_base * e^(-1 * g_delay_param * g_base)
 } else {
   # without delay
   g_basevalue <- (1/24 + g_base/24)^(-1)
