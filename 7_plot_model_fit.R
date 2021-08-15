@@ -88,7 +88,7 @@ if (compute_voronoi) {
   triggering_at_locs_with_all_times_fun <- function(a, xs, ys, i, theta) {
     h_all_locs <- h_fun(xs - a$coorx[i], ys - a$coory[i])
     g_at_time_marks <- g_fun(time_marks - a$days[i])
-    trigger_constant <- theta[unlist(a[i, 'e_type']) + 1]
+    trigger_constant <- theta[as.numeric(a[i, 'e_type'])]
     output <- colSums(trigger_constant * (g_at_time_marks %o% h_all_locs)) # gives a T x S matrix
     return(output)
   }
@@ -132,9 +132,6 @@ if (compute_voronoi) {
     # This will sample all cells in one go
     eval_points <- st_sample(voronoi_polygons, size=rep(voronoi_num_samples, nrow(voronoi_polygons)))
     eval_points_coords <- st_coordinates(eval_points)
-    
-    
-    
     
     pb <- txtProgressBar(min=1, max=nrow(da), initial=1)
     trig_part_all_times <- Matrix(0, 1, nrow(eval_points_coords))
