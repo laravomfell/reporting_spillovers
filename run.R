@@ -194,6 +194,7 @@ if (!is_real_data) {
                         "_np_", n_p,
                         "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
                         "_parents_proportion_", gsub('\\.', '_', parents_proportion))
+  data_id <- gen_data_id
   gen_data_fname <- paste0("da_", gen_data_id, ".csv")
   print(paste0(">>>>>> DATA FILE NAME: ", gen_data_fname))
 
@@ -214,6 +215,7 @@ if (!is_real_data) {
                           "_bw_g_", format(bw_g, nsmall=1, digits=2, decimal.mark='_'),
                           "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                           "_delay_g_", tolower(g_init_delay_flag))
+  data_id <- "da_police_data"
   source("prepare_data.R")
   da <- read.csv("da_type.csv")
   

@@ -144,7 +144,7 @@ background_basevalue <- as(matrix(0,
 # write sparse matrix for each event
 make_bg_smoothers <- function(i){
   # set file name
-  fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
+  fn <- paste0("background_smoothers/", data_id, "_bgsmoother_", i, ".mtx")
   
   if(!file.exists(fn)) {
     ## for each location on the grid, add density of each event
@@ -170,7 +170,7 @@ foreach(i = which(da$e_type == 0)) %dopar% make_bg_smoothers(i)
 for (i in which(da$e_type == 0)){
   if (i %% 500 == 0) print(paste("on:", i))
   
-  fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
+  fn <- paste0("background_smoothers/", data_id, "_bgsmoother_", i, ".mtx")
   bgsmoother <- readMM(fn)
   
   background_basevalue <- background_basevalue + bgsmoother
@@ -334,7 +334,7 @@ h_rep <- matrix(0L,
 
 # this gives for each grid cell the number of events that can 'reach' this cell in terms of triggering.
 for(i in 1:nrow(da)){
-  fn <- paste0("h_space_marks/", experiment_id, "_h_marks_", i, ".csv")
+  fn <- paste0("h_space_marks/", data_id, "_h_marks_", i, ".csv")
   
   h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + da$coorx[i],
                                rep(1, d) %o% h_base_y + da$coory[i],
@@ -417,7 +417,7 @@ while (k < 40){
   # read every single event density in again
   for(i in which(da$e_type == 0)){
     if (i %% 500 == 0) print(paste("on bgsmoother:", i))
-    fn <- paste0("background_smoothers/", gen_data_id, "_bgsmoother_", i, ".mtx")
+    fn <- paste0("background_smoothers/", data_id, "_bgsmoother_", i, ".mtx")
     bgsmoother <- readMM(fn)
     background_basevalue <- background_basevalue + bg_probs[id[i]] * bgsmoother
   }
@@ -434,7 +434,7 @@ while (k < 40){
   
   calc_h_edge_corr <- function(i){
     # create matrix of 1's in correct dimensions
-    fn <- paste0("h_space_marks/", experiment_id, "_h_marks_", i, ".csv")
+    fn <- paste0("h_space_marks/", data_id, "_h_marks_", i, ".csv")
     h_mark_temp <- matrix(1L, nrow = d, ncol = d)
     
     # if some elements are 0 (checked by file.exists),
