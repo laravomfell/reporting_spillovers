@@ -208,7 +208,7 @@ if (compute_voronoi) {
     stat_function(aes(x = residuals, y = ..y..),
                   fun = function(x) dgamma(1-x, shape=3.569, scale=1/3.569),
                   n = 100, alpha=0.8, color = "red")
-  p
+  print(p)
   dev.off()
   
   st_write(voronoi_polygons, paste0("results/voronoi_", experiment_id, ".shp"))
