@@ -192,6 +192,16 @@ if (g_init_delay_flag) {
   g_basevalue <- (1/24 + g_base/24)^(-1)
 }
 
+p <- ggplot(data.frame(x = g_base, y = g_basevalue), aes(x,y)) + 
+  geom_line(color = "black", size = 0.9) +
+  theme(panel.grid = element_blank()) +
+  scale_x_continuous(breaks = c(seq(0, 5, 1), 10, 15, 20, 25, 30)) +
+  labs(x = "Time in days", y = "g(t)") + geom_hline(yintercept = 0, linetype = "dotted")
+ggsave(paste0("figures/", experiment_id, "_gt_init.pdf"), plot = p, width = 4.5, height=3.5)
+
+
+
+
 # we normalize by the integral over the entire time window
 g_basevalue <- g_basevalue / simpson(g_basevalue, time_units)
 

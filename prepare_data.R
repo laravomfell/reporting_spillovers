@@ -67,6 +67,8 @@ foo <- function(x, mu, sigma){
    mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
 }
 
+
+print(paste("Using", n_p, "neighbours to define the smoothing disc."))
 da$bg_integral <- foreach(i = 1:nrow(da),
                           .combine = "c") %dopar% polyCub::polyCub.SV(w,
                                                                       foo,
