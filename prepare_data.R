@@ -49,20 +49,6 @@ for(i in 1:nrow(da)){
    }
 }
 
-
-# Read boundary
-boundary <- read_sf("cov.shp", crs = 27700)
-# extract boundaries
-bbox <- st_bbox(boundary) / 1000
-
-boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
-boundary$x <- boundary$X / 1000
-boundary$y <- boundary$Y / 1000
-
-# reverse x and y for owin
-boundary$x <- rev(boundary$x)
-boundary$y <- rev(boundary$y)
-
 da$bg_integral <- rep(0, nrow(da))
 
 w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)

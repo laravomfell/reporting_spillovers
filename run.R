@@ -217,8 +217,7 @@ if (!is_real_data) {
                           "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                           "_delay_g_", tolower(g_init_delay_flag))
   data_id <- paste0("da_police_data_", "np_", n_p)
-  source("prepare_data.R")
-  da <- read.csv("da_type.csv")
+  source("prepare_data.R") # this will read the dataset with real crimes
   
   shp <- read_sf("cov.shp", crs = 27700)
   # extract the boundary

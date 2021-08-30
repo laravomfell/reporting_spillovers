@@ -1,5 +1,5 @@
 # First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
-dyn.load('poly.so')
+dyn.load('poly')
 
 inpoly <-  function(x, y, px, py){
   .Fortran("polyse",
