@@ -38,11 +38,12 @@ da$coory <- da$coory + runif(nrow(da), -0.0005, 0.0005)
 # set bandwidth around events
 da$bandwidth <- rep(0.01, nrow(da))
 
-for(i in 1:nrow(da)){
-   # calculate sq distances to all points not == i
-   temp <- dist.squared(da$coorx[i], da$coory[i], da$coorx[-i], da$coory[-i])
-   # n_p = 5
-   temp2 <- sqrt(sort(temp[temp >= 0.002^2])[5])
+for (i in 1:nrow(da)){
+   # calculate sq distances to all points which are initial events (including i)
+   temp <- dist.squared(da$coorx[i], da$coory[i], 
+                        da$coorx[da$e_type == 0], da$coory[da$e_type == 0])
+   # n_p+1 since we don't exclude i above 
+   temp2 <- sqrt(sort(temp[temp >= 0.002^2])[n_p + 1])
    # replace bandwidth if too small otherwise
    if(da$bandwidth[i] <= temp2){
       da$bandwidth[i] <- temp2
