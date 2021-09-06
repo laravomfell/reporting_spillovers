@@ -1,4 +1,4 @@
-# This run file reproduces all the analyses for the project 
+# This run file reproduces all the analyses for the project
 #`(No) Spillovers in domestic abuse reporting'
 # by Lara Vomfell and Jan Povala.
 
@@ -6,7 +6,7 @@
 # Date: 11/02/2021
 
 # The original underlying the project cannot be shared. Also, we cannot identify
-# the location of the police force who provided us with the data. 
+# the location of the police force who provided us with the data.
 # As a consequence, we also cannot share some of the GIS operations but we
 # try to provide as much of the analysis code as possible.
 
@@ -110,13 +110,13 @@ option_list = list(
   make_option("--snapshot", action="store_true", default=FALSE),
   make_option("--voronoi", action="store_true", default=FALSE),
   make_option("--g_delay", action="store_true", default=FALSE),
-  make_option(c("-n", "--numsmooth"), type="integer", default=10, 
+  make_option(c("-n", "--numsmooth"), type="integer", default=10,
               help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
   make_option("--allevents", type="integer", default=2000,
               help="Number of all events, [default= %default]", metavar="integer"),
-  make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
+  make_option(c("-s", "--startdate"), type="character", default=default_start_date,
               help="Start date.", metavar="character"),
-  make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
+  make_option(c("-e", "--enddate"), type="character", default=default_end_date,
               help="End date.", metavar="character"),
   make_option("--follow_trig_prob", type="numeric", default=0.00,
               help="Percentage of the triggered events that generate follow up events."),
@@ -159,7 +159,7 @@ if (!is_real_data) {
   followup_trig_prob <- opt$follow_trig_prob
   parents_proportion <- opt$parents_proportion
   regen_data <- opt$regenerate
-  
+
   experiment_id <- paste0("synth_",
                           opt$experimentid,
                           "_numevents_", num_all_events,
@@ -172,20 +172,20 @@ if (!is_real_data) {
                           "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
                           "_parents_proportion_", gsub('\\.', '_', parents_proportion),
                           "_delay_g_", tolower(g_init_delay_flag))
-  
+
   # here we would normally load our shapefile, but instead we use the generated circle
-  # create circle with radius 9.3km which given an area similar to the area we study.
+  # create circle with radius 5.6km which given an area similar to the area we study.
   angle_increments <- 2 * pi / 1000
   # create angles
   ang <- seq(0, 2 * pi - angle_increments, by = angle_increments)
-  circ <- data.frame(x = 9.3 + 9.3 * cos(ang),
-                     y = 9.3 + 9.3 * sin(ang))
+  circ <- data.frame(x = 5.6 + 5.6 * cos(ang),
+                     y = 5.6 + 5.6 * sin(ang))
   w <- owin(poly = circ)
   shp <- st_as_sf(w)
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
   # inpoly needs list to boundary coordinates
   shp_area <- st_area(shp)
-  
+
   # extract the boundary
   bbox <- st_bbox(shp)
 
@@ -207,7 +207,7 @@ if (!is_real_data) {
     source("1_generate_data.R")
   }
 } else {
-  experiment_id <- paste0("real_", 
+  experiment_id <- paste0("real_",
                           opt$experimentid,
                           "_np_", n_p,
                           "_bw_daily_", format(bw_daily, nsmall=1, digits=2, decimal.mark='_'),
@@ -218,17 +218,17 @@ if (!is_real_data) {
                           "_delay_g_", tolower(g_init_delay_flag))
   data_id <- paste0("da_police_data_", "np_", n_p)
   source("prepare_data.R") # this will read the dataset with real crimes
-  
+
   shp <- read_sf("cov.shp", crs = 27700)
   # extract the boundary
   bbox <- st_bbox(shp) / 1000
   # extract precise area
   shp_area <- units::drop_units(st_area(shp)/1000^2)
-  
+
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
   boundary$X <- boundary$X / 1000
   boundary$Y <- boundary$Y / 1000
-  
+
   # reverse x and y for owin
   boundary$X <- rev(boundary$X)
   boundary$Y <- rev(boundary$Y)
