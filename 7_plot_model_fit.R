@@ -16,11 +16,36 @@ trigger_at_all_locations <- map(event_types, function(x) reduce(trigger_at_all_l
 # multiply through with theta and simplify
 lambda_at_all_locations <- mu0 * bg_at_all_locations + reduce(map2(trigger_at_all_locations, theta, `*`), `+`)
 
-# creating the diagonal plot
-n_events <- nrow(da[da$e_type == 0,])
+first_time_visit_times <- da$days[da$e_type == 0]
+n_events <- length(first_time_visit_times)
 
+# creating the diagonal plot
 fit <- data.frame(y = cumsum(lambda_at_all_locations) * (time_marks[2] - time_marks[1]),
-                  x = stepfun(da$days[da$e_type == 0], 0:n_events)(time_marks))
+                  x = stepfun(first_time_visit_times, 0:n_events)(time_marks))
+
+
+# Doing a statistical test for transformed process values
+
+# option 1:
+# tt_process <- approxfun(time_marks,  fit$y, yleft=0, yright=0)(first_time_visit_times)
+
+# option 2: 
+tt_process <- rep(0.0, n_events)
+for (i in 1:n_events) {
+  current_event_time <- first_time_visit_times[i]
+  tt_process[i] <- simpson(lambda_at_all_locations[1:length(time_marks[time_marks <= current_event_time])], time_marks[2] - time_marks[1])
+}
+
+temp_transf <- 1 - exp(- (tt_process - c(0, head(tt_process, -1))))
+ks_test_tp_result <- ks.test(temp_transf, punif)
+
+# Save the KS test results in the inference output
+write(paste("TT_PROCESS_KS", ks_test_tp_result$statistic, ks_test_tp_result$p.value), 
+      file = paste0("results/inferred_params", experiment_id, ".out"),
+      append = TRUE)
+
+
+
 p <- ggplot(fit,
             aes(x,y)) + 
   geom_ribbon(data = data.frame(x = 0:n_events, y = 0,
