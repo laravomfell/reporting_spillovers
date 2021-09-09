@@ -346,16 +346,19 @@ h_rep <- matrix(0L,
 for(i in 1:nrow(da)){
   fn <- paste0("h_space_marks/", data_id, "_h_marks_", i, ".csv")
   
-  h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + da$coorx[i],
-                               rep(1, d) %o% h_base_y + da$coory[i],
-                               boundary$X,
-                               boundary$Y) >= 0,
-                        ncol = d)
-  idx <- which(h_mark_temp == FALSE)
-  # no need to write anything if all values are TRUE
-  if (length(idx) == 0) next
-  fwrite(data.table(idx), file = fn)
   
+    h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + da$coorx[i],
+                                 rep(1, d) %o% h_base_y + da$coory[i],
+                                 boundary$X,
+                                 boundary$Y) >= 0,
+                          ncol = d)
+    idx <- which(h_mark_temp == FALSE)
+    # no need to write anything if all values are TRUE
+    if (length(idx) == 0) next
+    
+    if (! file.exists(fn)) {
+      fwrite(data.table(idx), file = fn)
+    }
   h_rep <- h_rep + h_mark_temp
 }
 
