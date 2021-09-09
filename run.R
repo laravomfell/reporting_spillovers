@@ -45,7 +45,7 @@ gpclibPermit()
 library(foreach)
 library(doParallel)
 no_cores <- parallel::detectCores()
-no_cores <- min(no_cores, 8)
+no_cores <- min(no_cores, 4)
 
 
 cl <- makeCluster(no_cores)
