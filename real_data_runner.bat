@@ -5,7 +5,7 @@ SetLocal
 set NP=2 5 10
 set BW_H=0.6 0.8 1.0 1.2
 set BW_G=1.0
-set BW_TREND=10 20 
+set BW_TREND=5 10 20
 set BW_WEEKLY=0.33333
 set BW_DAILY=0.041667
 
