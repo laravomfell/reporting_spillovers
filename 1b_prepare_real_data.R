@@ -1,19 +1,3 @@
-library(spatstat)
-library(sf)
-library(polyCub)
-library(mvtnorm)
-gpclibPermit()
-
-library(foreach)
-library(doParallel)
-
-# set seed to jitter
-set.seed(1)
-
-no_cores <- parallel::detectCores()
-cl <- makeCluster(no_cores)
-registerDoParallel(cl)
-
 # pretty self explanatory
 dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 
@@ -38,11 +22,12 @@ da$coory <- da$coory + runif(nrow(da), -0.0005, 0.0005)
 # set bandwidth around events
 da$bandwidth <- rep(0.01, nrow(da))
 
-for(i in 1:nrow(da)){
-   # calculate sq distances to all points not == i
-   temp <- dist.squared(da$coorx[i], da$coory[i], da$coorx[-i], da$coory[-i])
-   # n_p = 5
-   temp2 <- sqrt(sort(temp[temp >= 0.002^2])[5])
+for (i in 1:nrow(da)){
+   # calculate sq distances to all points which are initial events (including i)
+   temp <- dist.squared(da$coorx[i], da$coory[i], 
+                        da$coorx[da$e_type == 0], da$coory[da$e_type == 0])
+   # n_p+1 since we don't exclude i above 
+   temp2 <- sqrt(sort(temp[temp >= 0.002^2])[n_p + 1])
    # replace bandwidth if too small otherwise
    if(da$bandwidth[i] <= temp2){
       da$bandwidth[i] <- temp2
@@ -50,8 +35,6 @@ for(i in 1:nrow(da)){
 }
 
 da$bg_integral <- rep(0, nrow(da))
-
-w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
 
 #for(i in 1:nrow(da)){
 #   if (i %% 100 == 0) print(paste("on:", i))
@@ -67,7 +50,6 @@ foo <- function(x, mu, sigma){
    mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
 }
 
-
 print(paste("Using", n_p, "neighbours to define the smoothing disc."))
 da$bg_integral <- foreach(i = 1:nrow(da),
                           .combine = "c") %dopar% polyCub::polyCub.SV(w,
@@ -77,5 +59,4 @@ da$bg_integral <- foreach(i = 1:nrow(da),
                                                                       plot=F,
                                                                       nGQ = 15)
 
-write.csv(da, file = "da_type.csv", row.names = F)
-stopCluster(cl)
+write.csv(da, file = preprocessed_fname, row.names = F)

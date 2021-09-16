@@ -80,6 +80,10 @@ label_10 <- function(...){
 # set parameter precision
 tol <- 1e-5
 
+# set seed to jitter
+set.seed(1)
+
+
 # run once
 if (!file.exists("poly.dll") & !file.exists("poly.so")){
   stop("You need to run 'R CMD SHLIB poly.f' on the command line once to install a (fast) Fortran version of inpoly check")
@@ -183,8 +187,8 @@ if (!is_real_data) {
   w <- owin(poly = circ)
   shp <- st_as_sf(w)
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-  # inpoly needs list to boundary coordinates
-  shp_area <- st_area(shp)
+  boundary$x <- boundary$X
+  boundary$y <- boundary$Y
 
   # extract the boundary
   bbox <- st_bbox(shp)
@@ -204,7 +208,7 @@ if (!is_real_data) {
   } else {
     print("Regenerating synthetic data.")
     library(stpp)
-    source("1_generate_data.R")
+    source("1a_generate_synthetic_data.R")
   }
 } else {
   experiment_id <- paste0("real_",
@@ -217,21 +221,28 @@ if (!is_real_data) {
                           "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                           "_delay_g_", tolower(g_init_delay_flag))
   data_id <- paste0("da_police_data_", "np_", n_p)
-  source("prepare_data.R") # this will read the dataset with real crimes
-
+  
   shp <- read_sf("cov.shp", crs = 27700)
   # extract the boundary
   bbox <- st_bbox(shp) / 1000
-  # extract precise area
-  shp_area <- units::drop_units(st_area(shp)/1000^2)
 
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
   boundary$X <- boundary$X / 1000
   boundary$Y <- boundary$Y / 1000
-
+  
   # reverse x and y for owin
-  boundary$X <- rev(boundary$X)
-  boundary$Y <- rev(boundary$Y)
+  boundary$x <- rev(boundary$X)
+  boundary$y <- rev(boundary$Y)
+
+  # This is necessary for spatial bandwidth computation
+  w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
+
+  preprocessed_fname <- paste0(data_id, "_preprocessed.csv")
+  if (!file.exists(preprocessed_fname)) {
+    source("1b_prepare_real_data.R")
+  } else {
+    da <- read.csv(preprocessed_fname)
+  }
 }
 
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
