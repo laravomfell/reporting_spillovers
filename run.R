@@ -195,6 +195,9 @@ if (!is_real_data) {
 
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
 
+cl <- makeCluster(no_cores)
+registerDoParallel(cl)
+
 # Running the model -----------------------------------------------------------
 source("2_model.R")
 
