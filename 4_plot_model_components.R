@@ -92,8 +92,8 @@ ggsave(paste0("figures/", experiment_id, "_mu_bg.png"), plot = p, width = 3.5, h
 # a) g(t)
 gt <- data.frame(x = g_base, y = g_basevalue)
 p <- ggplot(gt, aes(x,y)) + geom_point(data = data.frame(mids = g_temp$mids,
-                                                         density = g_temp$density), 
-                                       aes(mids, density), alpha = .4, shape = 21, color = "#4c4c4c") + 
+                                                    density = g_temp$density), 
+                                  aes(mids, density), alpha = .4, shape = 21, color = "#4c4c4c") + 
   geom_line(color = "black", size = 0.9) +
   theme(panel.grid = element_blank()) +
   scale_x_continuous(breaks = c(seq(0, 5, 1), 10, 15, 20, 25, 30)) +
@@ -125,8 +125,8 @@ h_s <- cbind(expand.grid(x = h_base_x * 1000, y = h_base_y * 1000),
 
 # This is temporary for the experimentation stage.
 p <- ggplot(h_s, aes(x, y, z= z, colour=stat(level))) +
-  labs(x = "Distance in X (in m)", y = "Distance in Y (in m)") + 
-  geom_contour() +
-  scale_color_gradient(low = "gray100", high = "gray0", space = "Lab", 
-                       guide = guide_colorbar(title="h(s)", title.position="top"))                         
+    labs(x = "Distance in X (in m)", y = "Distance in Y (in m)") + 
+    geom_contour() +
+    scale_color_gradient(low = "gray100", high = "gray0", space = "Lab", 
+                         guide = guide_colorbar(title="h(s)", title.position="top"))                         
 ggsave(paste0("figures/", experiment_id, "_hs.pdf"), plot = p, width = 3.5, height = 3.5)

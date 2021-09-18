@@ -16,11 +16,35 @@ trigger_at_all_locations <- map(event_types, function(x) reduce(trigger_at_all_l
 # multiply through with theta and simplify
 lambda_at_all_locations <- mu0 * bg_at_all_locations + reduce(map2(trigger_at_all_locations, theta, `*`), `+`)
 
+first_time_visit_times <- da$days[da$e_type == 0]
 # creating the diagonal plot
-n_events <- nrow(da[da$e_type == 0,])
+n_events <- length(first_time_visit_times)
 
+# creating the diagonal plot
 fit <- data.frame(y = cumsum(lambda_at_all_locations) * (time_marks[2] - time_marks[1]),
-                  x = stepfun(da$days[da$e_type == 0], 0:n_events)(time_marks))
+                  x = stepfun(first_time_visit_times, 0:n_events)(time_marks))
+
+
+# Doing a statistical test for transformed process values
+
+# option 1:
+# tt_process <- approxfun(time_marks,  fit$y, yleft=0, yright=0)(first_time_visit_times)
+
+# option 2: 
+tt_process <- rep(0.0, n_events)
+for (i in 1:n_events) {
+  current_event_time <- first_time_visit_times[i]
+  tt_process[i] <- simpson(lambda_at_all_locations[1:length(time_marks[time_marks <= current_event_time])], time_marks[2] - time_marks[1])
+}
+
+temp_transf <- 1 - exp(- (tt_process - c(0, head(tt_process, -1))))
+ks_test_tp_result <- ks.test(temp_transf, punif)
+
+# Save the KS test results in the inference output
+write(paste("TT_PROCESS_KS", ks_test_tp_result$statistic, ks_test_tp_result$p.value), 
+      file = paste0("results/inferred_params", experiment_id, ".out"),
+      append = TRUE)
+
 p <- ggplot(fit,
             aes(x,y)) + 
   geom_ribbon(data = data.frame(x = 0:n_events, y = 0,
@@ -189,6 +213,21 @@ if (compute_voronoi) {
                                          expected_count_for_cell <-  polygon_area * mean(lambda_at_probes)
                                          expected_count_for_cell
                                        }
+       points_in_cell <- st_sample(voronoi_polygons[cell_i, ], size=voronoi_num_samples)
+       eval_points_coords <- st_coordinates(points_in_cell)
+       polygon_area <- st_drop_geometry(voronoi_polygons[cell_i, 'area'])
+       triggering <- numeric(nrow(eval_points_coords))
+       for (i in 1:nrow(da)) {
+         triggering <- triggering + triggering_at_locs_with_all_times_fun(a = da,
+                                                                          x = eval_points_coords[, 1], y = eval_points_coords[, 2],
+                                                                          i = i, theta = theta)
+       }
+       trigger_contribution <- (TT / length(time_marks)) * triggering
+       lambda_at_probes <- mu0 * background_fun(eval_points_coords[, 1],
+                                                eval_points_coords[, 2]) * time_integral_bg + trigger_contribution
+       expected_count_for_cell <-  polygon_area * mean(lambda_at_probes)
+       expected_count_for_cell
+    }
     toc()
     voronoi_polygons[, 'expected_count'] <- unlist(voronoi_expected_counts)
   }
@@ -223,7 +262,7 @@ if (compute_voronoi) {
   write(paste("PIT_KS", ks_test_D_stat, ks_test_p_val), 
         file = paste0("results/inferred_params", experiment_id, ".out"),
         append = TRUE)
-  
+
   pdf(paste0("figures/", experiment_id, "_voronoi_res_pit_test.pdf")) 
   p <- ggplot(data.frame(pit = pit_values)) +
     geom_histogram(aes(x = pit, y = ..density..),
@@ -239,7 +278,7 @@ if (compute_voronoi) {
   # Q-Q plot with confidence bounds
   pdf(paste0("figures/", experiment_id, "_voronoi_res_qq_plot.pdf")) 
   p <- ggplot(data = data.frame(vals = 1 - voronoi_polygons$residuals),
-              mapping = aes(sample = vals)) +
+               mapping = aes(sample = vals)) +
     stat_qq_band(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569), bandType="boot") +
     stat_qq_line(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569)) +
     stat_qq_point(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569)) +

@@ -1,13 +1,26 @@
-source2 <- function(file, start, end, ...) {
-  file.lines <- scan(file, what=character(), skip=start-1, nlines=end-start+1, sep='\n', quiet = T)
-  file.lines.collapsed <- paste(file.lines, collapse='\n')
-  source(textConnection(file.lines.collapsed), ...)
+# First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
+if(.Platform$OS.type == "unix") {
+  dyn.load('poly.so')
+} else {
+  dyn.load('poly')
 }
 
-# First step is to load function \texttt{inpoly}, which find whether each of an array of points is inside or outside of a given polygon.
- 
-source('inpoly.r')
-library(fields)
+
+inpoly <-  function(x, y, px, py){
+  .Fortran("polyse",
+           as.double(px), 
+           as.double(py),
+           as.integer(length(px)),
+           as.double(x),
+           as.double(y), 
+           as.integer(length(x)),
+           flag=integer(length(x))
+  )$flag
+}
+
+polyarea <- function(px,py){
+  .Fortran('calcularea', as.double(px), as.double(py), as.integer(length(px)),area=as.double(0))$area
+}
 
 # this is Simpson's integral approximation where you approx
 # int_a^b f(x)dx by splitting [a,b] into m chunks and then calcul
@@ -105,11 +118,12 @@ hist.weighted.2D <- function(x, y, weight, x.breaks, y.breaks){
    y1.mat <- rep(1, nby) %o% y.breaks
    
    list(x.breaks=x.breaks, y.breaks=y.breaks, x.mids=mids.x,
-        y.mids = mids.y, counts=freq, density=freq/sum(freq)/(x1.mat[2:nbx,2:nby]-x1.mat[1:(nbx-1),1:(nby-1)])/(y1.mat[2:nbx, 2:nby]-y1.mat[1:(nbx-1),1:(nby-1)]))                  
+        y.mids = mids.y, counts=freq, 
+        density=freq/sum(freq)/(x1.mat[2:nbx,2:nby]-x1.mat[1:(nbx-1),1:(nby-1)])/(y1.mat[2:nbx, 2:nby]-y1.mat[1:(nbx-1),1:(nby-1)]))                  
 }
 
 
-# this function calculate the convolution of two functions f and
+# this function calculates the convolution of two functions f and
 # f is just the density coming from our weighted histogram
 # g is c(kernel of [0,1], -kernel of [0,1])
 # we then calculate f x g = F^-1(F(f) * F(g))
@@ -147,9 +161,6 @@ ker.smooth.2D.fft<- function(x, y, z, x.bandwidth,y.bandwidth){
   ker.val.y <- dnorm((1:nx)*dy-dy/2, 0, sd=y.bandwidth)
   ker.val.x <- c(ker.val.x, rev(ker.val.x))
   ker.val.y <- c(ker.val.y, rev(ker.val.y))
-    
-    
- # filled.contour( ker.val.x %o% ker.val.y )
    
   smoothed <- fft(fft(zz) *fft(ker.val.x %o% ker.val.y), inverse=T)/nx/ny/4*dx*dy
     

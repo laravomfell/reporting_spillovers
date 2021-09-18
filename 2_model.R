@@ -34,12 +34,14 @@
 
 # range of area
 
-# x_range <- c(min(boundary$X), max(boundary$X))
-# y_range <- c(min(boundary$Y), max(boundary$Y))
-
-# range of coordinates
-x_range <- c(bbox["xmin"], bbox["xmax"])
-y_range <- c(bbox["ymin"], bbox["ymax"])
+if (!is_real_data) {
+	x_range <- c(min(boundary$X), max(boundary$X))
+	y_range <- c(min(boundary$Y), max(boundary$Y))
+} else {
+	# range of coordinates
+	x_range <- c(bbox["xmin"], bbox["xmax"])
+	y_range <- c(bbox["ymin"], bbox["ymax"])
+}
 
 ra <- (x_range[2]-x_range[1])*(y_range[2]-y_range[1])
 
@@ -349,7 +351,7 @@ h_rep <- matrix(0L,
 # this gives for each grid cell the number of events that can 'reach' this cell in terms of triggering.
 for(i in 1:nrow(da)){
   fn <- paste0("h_space_marks/", data_id, "_h_marks_", i, ".csv")
-  
+
   h_mark_temp <- matrix(inpoly(h_base_x %o% rep(1, d) + da$coorx[i],
                                rep(1, d) %o% h_base_y + da$coory[i],
                                boundary$X,
@@ -358,8 +360,10 @@ for(i in 1:nrow(da)){
   idx <- which(h_mark_temp == FALSE)
   # no need to write anything if all values are TRUE
   if (length(idx) == 0) next
-  fwrite(data.table(idx), file = fn)
-  
+    
+  if (! file.exists(fn)) {
+      fwrite(data.table(idx), file = fn)
+  }
   h_rep <- h_rep + h_mark_temp
 }
 
@@ -606,3 +610,4 @@ write(res$value, file = paste0("results/inferred_params", experiment_id, ".out")
 if (save_snapshot) {
   save.image(file=paste0("results/snapshot_", experiment_id, ".RData"))
 }
+

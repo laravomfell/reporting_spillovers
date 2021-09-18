@@ -1,19 +1,3 @@
-library(spatstat)
-library(sf)
-library(polyCub)
-library(mvtnorm)
-gpclibPermit()
-
-library(foreach)
-library(doParallel)
-
-# set seed to jitter
-set.seed(1)
-
-no_cores <- parallel::detectCores()
-cl <- makeCluster(no_cores)
-registerDoParallel(cl)
-
 # pretty self explanatory
 dist.squared <- function(x1, y1, x2, y2) {(x1-x2)^2+(y1-y2)^2}
 
@@ -50,23 +34,7 @@ for (i in 1:nrow(da)){
    }
 }
 
-
-# Read boundary
-boundary <- read_sf("cov.shp", crs = 27700)
-# extract boundaries
-bbox <- st_bbox(boundary) / 1000
-
-boundary <- data.frame(st_coordinates(boundary)[, c("X", "Y")])
-boundary$x <- boundary$X / 1000
-boundary$y <- boundary$Y / 1000
-
-# reverse x and y for owin
-boundary$x <- rev(boundary$x)
-boundary$y <- rev(boundary$y)
-
 da$bg_integral <- rep(0, nrow(da))
-
-w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
 
 #for(i in 1:nrow(da)){
 #   if (i %% 100 == 0) print(paste("on:", i))
@@ -82,6 +50,7 @@ foo <- function(x, mu, sigma){
    mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
 }
 
+print(paste("Using", n_p, "neighbours to define the smoothing disc."))
 da$bg_integral <- foreach(i = 1:nrow(da),
                           .combine = "c") %dopar% polyCub::polyCub.SV(w,
                                                                       foo,
@@ -90,5 +59,4 @@ da$bg_integral <- foreach(i = 1:nrow(da),
                                                                       plot=F,
                                                                       nGQ = 15)
 
-write.csv(da, file = "da_type.csv", row.names = F)
-stopCluster(cl)
+write.csv(da, file = preprocessed_fname, row.names = F)

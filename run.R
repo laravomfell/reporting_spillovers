@@ -1,3 +1,30 @@
+# This run file reproduces all the analyses for the project
+#`(No) Spillovers in domestic abuse reporting'
+# by Lara Vomfell and Jan Povala.
+
+# Author: Lara Vomfell
+# Date: 11/02/2021
+
+# The original underlying the project cannot be shared. Also, we cannot identify
+# the location of the police force who provided us with the data.
+# As a consequence, we also cannot share some of the GIS operations but we
+# try to provide as much of the analysis code as possible.
+
+# In the real example, we create a bounding grid over the shapefile
+# and then evaluate over the entire grid.
+# For the synthetic data, we generate events on a circle bounded by [0,1]
+# such that the bounding grid is the unit square.
+
+# note that running `5_plot_deprivation.R` and `6_plot_detached.R` will not work
+# since in the original, we match on 2011 ONS census unit strings
+# which our synthesized data does not have.
+
+# We also note that quite a few code operations are parallelized.
+# This code was written on a 64-bit Windows 10 machine, if you use a different
+# operating system you might have to change some steps.
+
+# Preliminaries ---------------------------------------------------------------
+
 # required libraries
 library(tictoc)
 library(spatstat)
@@ -18,6 +45,7 @@ gpclibPermit()
 library(foreach)
 library(doParallel)
 no_cores <- parallel::detectCores()
+
 no_cores <- min(no_cores, 8)
 
 
@@ -51,6 +79,9 @@ label_10 <- function(...){
 
 # set parameter precision
 tol <- 1e-5
+
+# set seed to jitter
+set.seed(1)
 
 # run once
 if (!file.exists("poly.dll") & !file.exists("poly.so")){
@@ -144,23 +175,23 @@ if (!is_real_data) {
                           "_follow_trig_prob_", gsub('\\.', '_', followup_trig_prob),
                           "_parents_proportion_", gsub('\\.', '_', parents_proportion),
                           "_delay_g_", tolower(g_init_delay_flag))
-  
+
   # here we would normally load our shapefile, but instead we use the generated circle
-  # create circle with radius 9.3km which given an area similar to the area we study.
+  # create circle with radius 5.6km which given an area similar to the area we study.
   angle_increments <- 2 * pi / 1000
   # create angles
   ang <- seq(0, 2 * pi - angle_increments, by = angle_increments)
-  circ <- data.frame(x = 9.3 + 9.3 * cos(ang),
-                     y = 9.3 + 9.3 * sin(ang))
+  circ <- data.frame(x = 5.6 + 5.6 * cos(ang),
+                     y = 5.6 + 5.6 * sin(ang))
   w <- owin(poly = circ)
   shp <- st_as_sf(w)
   boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
-  # inpoly needs list to boundary coordinates
-  shp_area <- st_area(shp)
-  
+  boundary$x <- boundary$X
+  boundary$y <- boundary$Y
+
   # extract the boundary
   bbox <- st_bbox(shp)
-  
+
   # Synthetic data generation ---------------------------------------------------
   gen_data_id <- paste0(opt$experimentid,
                         "_numevents_", num_all_events,
@@ -179,7 +210,7 @@ if (!is_real_data) {
     source("1_generate_data.R")
   }
 } else {
-  experiment_id <- paste0("real_", 
+  experiment_id <- paste0("real_",
                           opt$experimentid,
                           "_np_", n_p,
                           "_bw_daily_", format(bw_daily, nsmall=1, digits=2, decimal.mark='_'),
@@ -189,14 +220,31 @@ if (!is_real_data) {
                           "_bw_h_", format(bw_h, nsmall=1, digits=2, decimal.mark='_'),
                           "_delay_g_", tolower(g_init_delay_flag))
   data_id <- paste0("da_police_data_", "np_", n_p)
-  source("prepare_data.R") # this will read the dataset with real crimes
+  
+  shp <- read_sf("cov.shp", crs = 27700)
+  # extract the boundary
+  bbox <- st_bbox(shp) / 1000
+
+  boundary <- data.frame(st_coordinates(shp)[, c("X", "Y")])
+  boundary$X <- boundary$X / 1000
+  boundary$Y <- boundary$Y / 1000
+  
+  # reverse x and y for owin
+  boundary$x <- rev(boundary$X)
+  boundary$y <- rev(boundary$Y)
+
+  # This is necessary for spatial bandwidth computation
+  w <- owin(c(bbox["xmin"], bbox["xmax"]), c(bbox["ymin"], bbox["ymax"]), poly = boundary)
+
+  preprocessed_fname <- paste0(data_id, "_preprocessed.csv")
+  if (!file.exists(preprocessed_fname)) {
+    source("1b_prepare_real_data.R")
+  } else {
+    da <- read.csv(preprocessed_fname)
+  }
 }
 
-
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
-
-cl <- makeCluster(no_cores)
-registerDoParallel(cl)
 
 # Running the model -----------------------------------------------------------
 source("2_model.R")

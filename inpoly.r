@@ -1,4 +1,4 @@
-dyn.load('poly')
+dyn.load('poly.so')
 
 inpoly <-  function(x, y, px, py)
 {
