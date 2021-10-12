@@ -227,10 +227,10 @@ if (compute_voronoi) {
                                                 eval_points_coords[, 2]) * time_integral_bg + trigger_contribution
        expected_count_for_cell <-  polygon_area * mean(lambda_at_probes)
        expected_count_for_cell
-    }
-    toc()
-    voronoi_polygons[, 'expected_count'] <- unlist(voronoi_expected_counts)
   }
+  
+  toc()
+  voronoi_polygons[, 'expected_count'] <- unlist(voronoi_expected_counts)
   
   
   # Compute the residuals and save the shapefile for the Voronoi polygons

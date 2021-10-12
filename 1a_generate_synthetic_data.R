@@ -14,12 +14,12 @@ n_initial <- floor(n * 0.7)
 
 if (parents_proportion > 0.999) {
     print("Using homogeneous Poisson to generate the initial events.")
-    cluster_process_sim <- rpp(1, s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
+    cluster_process_sim <- rpp(1, s.region=as.matrix(boundary[, c("X", "Y")]), t.region=c(0, end_date - start_date + 1),
                                npoints=n_initial, replace=TRUE, discrete.time=FALSE)
 } else {
     print("Using a clustering process to generate the initial events.")
     lbda <- function(x,y,t,a){a*(2 + sin(((2 * pi) / 7) * t) + 2 + sin(2 * pi * t))}
-    cluster_process_sim <- rpcp(s.region=as.matrix(boundary), t.region=c(0, end_date - start_date + 1),
+    cluster_process_sim <- rpcp(s.region=as.matrix(boundary[, c("X", "Y")]), t.region=c(0, end_date - start_date + 1),
                                 nparents=floor(parents_proportion*n_initial), npoints=n_initial, infectious=TRUE,
                                 cluster=c("normal", "exponential"),
                                 dispersion=c(0.3, 10), lambda=lbda,

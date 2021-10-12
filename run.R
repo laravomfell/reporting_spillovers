@@ -207,7 +207,7 @@ if (!is_real_data) {
   } else {
     print("Regenerating synthetic data.")
     library(stpp)
-    source("1_generate_data.R")
+    source("1a_generate_synthetic_data.R")
   }
 } else {
   experiment_id <- paste0("real_",
