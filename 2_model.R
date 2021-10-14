@@ -112,7 +112,7 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 raw_trend_basevalue <- map(da$days[da$e_type == 0],
                            function(x) dnorm(x - time_marks, 0, bw_trend) + 
                              dnorm(x + time_marks, 0, bw_trend) +
-                             dnorm(x + 2 * TT - time_marks, TT, bw_trend))
+                             dnorm(x + 2 * TT - time_marks, 0, bw_trend))
 
 trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 
