@@ -110,9 +110,9 @@ weekly_basevalue <- weekly_basevalue / mean(weekly_basevalue)
 # calculate Gaussian kernel with boundary correction
 # time marks is the variable 'x'. Here we are applying the kernel to prevent the leakage.
 raw_trend_basevalue <- map(da$days[da$e_type == 0],
-                           function(x) dnorm(x - time_marks, 0, bw_trend) + 
-                             dnorm(x + time_marks, 0, bw_trend) +
-                             dnorm(x + 2 * TT - time_marks, 0, bw_trend))
+                           function(x_i) dnorm(time_marks - x_i, 0, bw_trend) + 
+                                         dnorm(time_marks + x_i, 0, bw_trend) +
+                                         dnorm(time_marks + x_i - 2 * TT, 0, bw_trend))
 
 trend_basevalue <- reduce(raw_trend_basevalue, `+`)
 

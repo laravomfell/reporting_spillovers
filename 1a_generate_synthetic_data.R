@@ -101,7 +101,7 @@ for(i in which(da$e_type == 0)){
   # calculate exact integral
   da$bg_integral[i] <- polyCub.exact.Gauss(w,
                                            mean=c(da$coorx[i], da$coory[i]),
-                                           Sigma=diag(da$bandwidth[i], 2),
+                                           Sigma=diag(da$bandwidth[i] ** 2, 2),
                                            plot=F)
 }
 

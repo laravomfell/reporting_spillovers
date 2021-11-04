@@ -55,7 +55,7 @@ da$bg_integral <- foreach(i = 1:nrow(da),
                           .combine = "c") %dopar% polyCub::polyCub.SV(w,
                                                                       foo,
                                                                       mu=c(da$coorx[i], da$coory[i]),
-                                                                      sigma=sqrt(da$bandwidth[i]),
+                                                                      sigma=da$bandwidth[i] ** 2,
                                                                       plot=F,
                                                                       nGQ = 15)
 
