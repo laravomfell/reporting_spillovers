@@ -38,7 +38,7 @@ for (i in 1:nrow(da)) {
 # this will produce TT x SS matrix
 
 
-lambda_all_times_and_locs <- (bg_temporal %o% bg_spatial_points) + trigger_all_times_and_locs
+lambda_all_times_and_locs <- mu0 * (bg_temporal %o% bg_spatial_points) + trigger_all_times_and_locs
 
 
 
