@@ -3,13 +3,18 @@ library(dplyr)
 library(lubridate)
 
 
-shp <- read_sf("cov.shp", crs = 27700)
+# shp <- read_sf("cov.shp", crs = 27700)
 
+
+
+shp <- st_set_crs(shp, 27700)
 region_boundary <- st_union(shp)
-grid_extent <- st_make_grid(shp, cellsize = 500)
+grid_extent <- st_make_grid(shp, cellsize = 0.5)
 region_gridded <- st_as_sf(st_intersection(region_boundary, grid_extent))
+region_gridded['cell_id'] <- 1:nrow(region_gridded)
+region_gridded$area <- st_area(region_gridded)
 
-plot(region_gridded)
+# plot(region_gridded)
 
 
 # create temporal discretisation: chop off incomplete weeks from either side of the year.
@@ -38,23 +43,43 @@ for (i in 1:nrow(da)) {
 # this will produce TT x SS matrix
 
 
+## Combine to get lambda
 lambda_all_times_and_locs <- mu0 * (bg_temporal %o% bg_spatial_points) + trigger_all_times_and_locs
 
 
 
+
+## Turn the spatial intensity points into an SF object of points
+spatial_points_df <- expand.grid(x = background_base$x, 
+                                 y = background_base$y)
+spatial_points_df <- spatial_points_df[as.vector(background_marks > 0), ]
+
+
+spatial_points_sf <- st_as_sf(spatial_points_df, coords = c("x", "y"), 
+                                                crs = 27700, agr = "constant") 
+
+spatial_points_cell_labels_sf <-st_join(spatial_points_sf, region_gridded,
+                                        join = st_intersects) #%>% group_by(region_gridded.x) %>% summarise(mean(bg_spatial_points_sf.value))
+spatial_points_cell_labels <- as.data.frame(spatial_points_cell_labels_sf$cell_id)
+spatial_points_cell_areas <- as.data.frame(spatial_points_cell_labels_sf$area)
+
+
 ## Project onto the coarser space-time grid with spatial join and temporal 
 
-# TODO: turn the spatial intensity points into an SF object of points
-#intensity_spatial_points_sf <- st_as_sf(DT, coords = c("longitude", "latitude"), 
-#                                                crs = 4326, agr = "constant") 
-  
-# TODO: spatial join into the grid, take the mean and multiplying by the cell area
-# st_join(intensity_spatial_points_sf, region_gridded) %>% group_by(region_gridded.x) %>% summarise(mean(bg_spatial_points_sf.value))
+lambda_all_locs_and_times <- transpose(lambda_all_times_and_locs)
+lambda_all_locs_and_times['cell_id'] <- spatial_points_cell_labels
+lambda_all_locs_and_times['area'] <- spatial_points_cell_areas
 
+lambda_all_cells_and_times <- lambda_all_locs_and_times %>% group_by(cell_id) %>%
+  summarise(across(everything(), mean))
 
+# multiply all rows by the corresponding cell area
+lambda_all_cells_and_times_area_int <- lambda_all_locs_and_times[, 'area'] * lambda_all_cells_and_times 
 
-## Combine to get lambda
+# drop the 'cell_id' and 'area' columns
+lambda_all_cells_and_times_area_int <- lambda_all_cells_and_times_area_int[ , !(names(lambda_all_cells_and_times_area_int) %in% c("cell_id","area"))]
 
-# multiply through with theta and simplify
-#lambda_at_all_locations <- mu0 * bg_at_all_locations + reduce(map2(trigger_at_all_locations, theta, `*`), `+`)
+## TODO: Now, do temporal aggregation
+lambda_all_times_and_cells <- transpose(lambda_all_cells_and_times_area_int)
 
+# TODO: finish this
