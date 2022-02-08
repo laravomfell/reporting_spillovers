@@ -20,8 +20,11 @@ region_gridded$area <- st_area(region_gridded)
 # create temporal discretisation: chop off incomplete weeks from either side of the year.
 x <- seq(as.Date(format(da[1, 'date_unif'], "%Y-01-01")), as.Date(format(da[1, 'date_unif'], "%Y-12-31")), by = "day")
 start_day <- which((weekdays(x) == "Monday" & yday(x) < 7) == TRUE)
-end_day <- which((weekdays(x) == "Sunday" & yday(x) > 358) == TRUE)
-time_marks_cut <- seq(start_day, end_day, 1/(TT/3.65))
+end_day <- which((weekdays(x) == "Sunday" & yday(x) > length(x) - 7) == TRUE)
+time_marks_cut <- seq(start_day - 1, end_day, 1/(TT/3.65))
+coarse_times_weekly <- seq(start_day - 1, end_day, 7)
+week_agg_labels <- cut(time_marks_cut, breaks = coarse_times_weekly, include.lowest = T, labels = F)
+
 
 
 ## Compute background components at all time_marks and all spatial points
@@ -79,7 +82,11 @@ lambda_all_cells_and_times_area_int <- lambda_all_locs_and_times[, 'area'] * lam
 # drop the 'cell_id' and 'area' columns
 lambda_all_cells_and_times_area_int <- lambda_all_cells_and_times_area_int[ , !(names(lambda_all_cells_and_times_area_int) %in% c("cell_id","area"))]
 
-## TODO: Now, do temporal aggregation
+## Transpose back to TT x SS shape
 lambda_all_times_and_cells <- transpose(lambda_all_cells_and_times_area_int)
 
-# TODO: finish this
+# Aggregate into weeks
+lambda_all_times_and_cells['week_id'] <- week_agg_labels
+lambda_all_weeks_and_cells <- lambda_all_times_and_cells %>% group_by(week_id) %>%
+  summarise(across(everything(), mean))
+lambda_all_weeks_and_cells <- 7 *  lambda_all_weeks_and_cells
