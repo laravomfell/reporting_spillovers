@@ -263,3 +263,6 @@ source("4_plot_model_components.R")
 
 # Plot model fit --------------------------------------------------------------
 source("7_plot_model_fit.R")
+
+# Save expected counts according to the current model for a pre-defined space-time grid
+source("8_expected_counts_grid.R")
