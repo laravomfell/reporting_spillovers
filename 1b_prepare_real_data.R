@@ -36,27 +36,27 @@ for (i in 1:nrow(da)){
 
 da$bg_integral <- rep(0, nrow(da))
 
-#for(i in 1:nrow(da)){
-#   if (i %% 100 == 0) print(paste("on:", i))
-#   # calculate exact integral
-#   da$bg_integral[i] <- polyCub.exact.Gauss(w,
-#                                           mean=c(da$coorx[i], da$coory[i]),
-#                                           Sigma=diag(da$bandwidth[i], 2), 
-#                                           plot=F)
-# }
-
-
-foo <- function(x, mu, sigma){
-   mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
+for(i in 1:nrow(da)){
+   if (i %% 100 == 0) print(paste("on:", i))
+   # calculate exact integral
+   da$bg_integral[i] <- polyCub.exact.Gauss(w,
+                                           mean=c(da$coorx[i], da$coory[i]),
+                                           Sigma=diag(da$bandwidth[i]^2, 2), 
+                                           plot=F)
 }
 
+
+#foo <- function(x, mu, sigma){
+#   mvtnorm::dmvnorm(x, mean = mu, sigma = sigma * diag(length(mu)), checkSymmetry = FALSE)
+#}
+
 print(paste("Using", n_p, "neighbours to define the smoothing disc."))
-da$bg_integral <- foreach(i = 1:nrow(da),
-                          .combine = "c") %dopar% polyCub::polyCub.SV(w,
-                                                                      foo,
-                                                                      mu=c(da$coorx[i], da$coory[i]),
-                                                                      sigma=da$bandwidth[i] ** 2,
-                                                                      plot=F,
-                                                                      nGQ = 15)
+#da$bg_integral <- foreach(i = 1:nrow(da),
+#                          .combine = "c") %dopar% polyCub::polyCub.SV(w,
+#                                                                      foo,
+#                                                                      mu=c(da$coorx[i], da$coory[i]),
+#                                                                      sigma=da$bandwidth[i] ** 2,
+#                                                                      plot=F,
+#                                                                      nGQ = 15)
 
 write.csv(da, file = preprocessed_fname, row.names = F)
