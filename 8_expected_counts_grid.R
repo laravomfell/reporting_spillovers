@@ -4,12 +4,38 @@ library(lubridate)
 library(tidyr)
 
 
-shp <- st_set_crs(shp, 27700)
-region_boundary <- st_union(shp)
-grid_extent <- st_make_grid(shp, cellsize = 0.5)
-region_gridded <- st_as_sf(st_intersection(region_boundary, grid_extent))
-region_gridded$cell_id <- 1:nrow(region_gridded)
-region_gridded$area <- st_area(region_gridded)
+if (!file.exists("results/spatial_points_sf.Rdata")){
+  
+  # grab boundary
+  region_boundary <- st_union(shp)
+  #500 x 500 m cells
+  grid_extent <- st_make_grid(shp, cellsize = 500)
+  region_gridded <- st_as_sf(st_intersection(region_boundary, grid_extent))
+  region_gridded$cell_id <- 1:nrow(region_gridded)
+  region_gridded$area <- st_area(region_gridded)
+  
+  ## Turn the spatial intensity points into an SF object of points
+  spatial_points_df <- expand.grid(x = background_base$x, 
+                                   y = background_base$y)
+  spatial_points_df <- spatial_points_df[as.vector(background_marks > 0), ]
+  
+  
+  spatial_points_sf <- st_as_sf(spatial_points_df, coords = c("x", "y"), 
+                                crs = 27700, agr = "constant") 
+  
+  spatial_points_cell_labels_sf <-st_join(spatial_points_sf, region_gridded,
+                                          join = st_intersects, largest=T, left = T)
+  
+  st_write(region_gridded, paste0("results/exp_counts_spatial_grid.shp"))
+  save(spatial_points_cell_labels_sf, file = "results/spatial_points_sf.RData")
+} else {
+  load("results/spatial_points_sf.RData")
+}
+
+
+
+
+
 
 
 # create temporal discretisation: chop off incomplete weeks from either side of the year.
@@ -19,8 +45,6 @@ end_day <- which((weekdays(x) == "Sunday" & yday(x) > length(x) - 7) == TRUE)
 time_marks_cut <- seq(start_day - 1, end_day, 1/(TT/3.65))
 coarse_times_weekly <- seq(start_day - 1, end_day, 7)
 week_agg_labels <- cut(time_marks_cut, breaks = coarse_times_weekly, include.lowest = T, labels = F)
-
-
 
 ## Compute background components at all time_marks and all spatial points
 
@@ -41,19 +65,6 @@ for (i in 1:nrow(da)) {
 
 ## Combine to get lambda
 lambda_all_times_and_locs <- mu0 * (bg_temporal %o% bg_spatial_points) + trigger_all_times_and_locs
-
-
-## Turn the spatial intensity points into an SF object of points
-spatial_points_df <- expand.grid(x = background_base$x, 
-                                 y = background_base$y)
-spatial_points_df <- spatial_points_df[as.vector(background_marks > 0), ]
-
-
-spatial_points_sf <- st_as_sf(spatial_points_df, coords = c("x", "y"), 
-                              crs = 27700, agr = "constant") 
-
-spatial_points_cell_labels_sf <-st_join(spatial_points_sf, region_gridded,
-                                        join = st_intersects, largest=T, left = T)
 
 num_NAs <- sum(is.na(spatial_points_cell_labels_sf$cell_id))
 print(paste("Number of unmatched points during the join: ", num_NAs))
@@ -92,5 +103,5 @@ lambda_all_weeks_and_cells <- lambda_all_weeks_and_cells[ , !(names(lambda_all_w
 print(paste("Number of predicted events using the coarse discretisation buckets: ", sum(lambda_all_weeks_and_cells)))
 print(paste("Number of actuall events in the dataset: ", sum(da$e_type == 0)))
 
-st_write(region_gridded, paste0("results/exp_counts_spatial_grid_", experiment_id, ".shp"))
+
 save(lambda_all_weeks_and_cells, file = paste0("results/exp_counts_data", experiment_id, ".RData"))
