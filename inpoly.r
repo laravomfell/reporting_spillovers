@@ -11,8 +11,6 @@ inpoly <-  function(x, y, px, py)
             as.integer(length(x)),
             flag=integer(length(x))
            )$flag
-
-
 }
 
 polyarea <- function(px,py)

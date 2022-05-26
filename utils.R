@@ -5,7 +5,6 @@ if(.Platform$OS.type == "unix") {
   dyn.load('poly')
 }
 
-
 inpoly <-  function(x, y, px, py){
   .Fortran("polyse",
            as.double(px), 
@@ -147,13 +146,11 @@ ker.smooth.fft<- function(x, z, bandwidth){
 }
 
 ker.smooth.2D.fft<- function(x, y, z, x.bandwidth,y.bandwidth){
-  
   nx <- nrow(z)
   ny <- ncol(z)
 
   zz  <- z[c(1:nx, seq(nx, 1, -1)), c(1:ny, seq(ny, 1, -1)) ] 
- 
-   
+
   dx <- x[2]-x[1]
   dy <- y[2]-y[1]
     
@@ -165,5 +162,4 @@ ker.smooth.2D.fft<- function(x, y, z, x.bandwidth,y.bandwidth){
   smoothed <- fft(fft(zz) *fft(ker.val.x %o% ker.val.y), inverse=T)/nx/ny/4*dx*dy
     
   Re(smoothed[1:(nx+1), 1:(ny+1)])
-    
 }

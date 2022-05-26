@@ -128,6 +128,10 @@ option_list = list(
   make_option("--bw_h", type="numeric", default=0.1,
               help="Bandwidth [in km] for the h(s) estimation."),
   #
+  # The following option is requried for the experiments when real_data=TRUE
+  #
+  make_option("--shp_fname", type="character", default="shape_file.cov"),
+  #
   # Options below are there for synthetic experiemtns: real_data=FALSE
   #
   make_option("--regenerate", action="store_true", default=FALSE),
@@ -211,9 +215,10 @@ if (!is_real_data) {
   } else {
     print("Regenerating synthetic data.")
     library(stpp)
-    source("1a_generate_synthetic_data.R")
+    source("generate_synthetic_data.R")
   }
 } else {
+  real_data_shp_fname <- opt$shp_fname
   experiment_id <- paste0("real_",
                           opt$experimentid,
                           "_np_", n_p,
@@ -225,7 +230,7 @@ if (!is_real_data) {
                           "_delay_g_", tolower(g_init_delay_flag))
   data_id <- paste0("da_police_data_", "np_", n_p)
   
-  shp <- read_sf("cov.shp", crs = 27700)
+  shp <- read_sf(real_data_shp_fname, crs = 27700)
   # extract the boundary
   bbox <- st_bbox(shp) / 1000
 
@@ -242,7 +247,7 @@ if (!is_real_data) {
 
   preprocessed_fname <- paste0(data_id, "_preprocessed.csv")
   if (!file.exists(preprocessed_fname)) {
-    source("1b_prepare_real_data.R")
+    source("prepare_real_data.R")
   } else {
     da <- read.csv(preprocessed_fname)
   }
@@ -251,22 +256,19 @@ if (!is_real_data) {
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
 
 # Running the model ------------------------------------------------------------
-source("2_model.R")
+source("model.R")
 
 # Plot raw data summaries ------------------------------------------------------
-source("3_plot_data_summaries.R")
+source("plot_data_summaries.R")
 
 # Plot model components -------------------------------------------------------
-source("4_plot_model_components.R")
-
-# Plot against deprivation ----------------------------------------------------
-# source("5_plot_deprivation.R")
+source("plot_model_components.R")
 
 # Plot against detached -------------------------------------------------------
-# source("6_plot_detached.R")
+# source("plot_detached.R")
 
 # Plot model fit --------------------------------------------------------------
-source("7_plot_model_fit.R")
+source("plot_model_fit.R")
 
 # Save expected counts according to the current model for a pre-defined space-time grid
-source("8_expected_counts_grid.R")
+source("expected_counts_grid.R")
