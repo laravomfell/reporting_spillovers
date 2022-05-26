@@ -10,7 +10,7 @@ set.seed(42)
 # in our data, each event has a unique case_id, but some events are follow-ups so they belong to another case
 # in our data, the split is roughly 70/30
 n <- num_all_events
-n_initial <- floor(n * 0.7)
+n_initial <- floor(n * 0.9)
 
 if (parents_proportion > 0.999) {
     print("Using homogeneous Poisson to generate the initial events.")
@@ -22,7 +22,7 @@ if (parents_proportion > 0.999) {
     cluster_process_sim <- rpcp(s.region=as.matrix(boundary[, c("X", "Y")]), t.region=c(0, end_date - start_date + 1),
                                 nparents=floor(parents_proportion*n_initial), npoints=n_initial, infectious=TRUE,
                                 cluster=c("normal", "exponential"),
-                                dispersion=c(0.3, 10), lambda=lbda,
+                                dispersion=c(0.3, 10.0), lambda=lbda,
                                 a=100000)  
 }
 # animation(cluster_process_sim$xyt, s.region=cluster_process_sim$s.region, t.region=cluster_process_sim$t.region, runtime=20)
@@ -43,8 +43,8 @@ initial[, datetime_unif := start_date + 3600 * 24 * days]
 cutoff_idx <- nrow(initial[datetime_unif < end_date - 3600 * 24 * 14])
 followup <- initial[sample(cutoff_idx, size = floor(n - n_initial), replace = T),]
 # add tiny amount of jitter to avoid duplicate locations
-followup[, ":=" (coorx = coorx + runif(nrow(followup), -0.0005, 0.0005),
-                 coory = coory + runif(nrow(followup), -0.0005, 0.0005))]
+followup[, ":=" (coorx = coorx + runif(nrow(followup), -0.2, 0.2),
+                 coory = coory + runif(nrow(followup), -0.2, 0.2))]
 # add up between 1h to 14 days of time difference
 followup[, datetime_unif := datetime_unif + runif(nrow(followup), 3600, 1209600)]
 

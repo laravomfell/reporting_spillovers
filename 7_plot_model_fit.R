@@ -213,20 +213,6 @@ if (compute_voronoi) {
                                          expected_count_for_cell <-  polygon_area * mean(lambda_at_probes)
                                          expected_count_for_cell
                                        }
-       points_in_cell <- st_sample(voronoi_polygons[cell_i, ], size=voronoi_num_samples)
-       eval_points_coords <- st_coordinates(points_in_cell)
-       polygon_area <- st_drop_geometry(voronoi_polygons[cell_i, 'area'])
-       triggering <- numeric(nrow(eval_points_coords))
-       for (i in 1:nrow(da)) {
-         triggering <- triggering + triggering_at_locs_with_all_times_fun(a = da,
-                                                                          x = eval_points_coords[, 1], y = eval_points_coords[, 2],
-                                                                          i = i, theta = theta)
-       }
-       trigger_contribution <- (TT / length(time_marks)) * triggering
-       lambda_at_probes <- mu0 * background_fun(eval_points_coords[, 1],
-                                                eval_points_coords[, 2]) * time_integral_bg + trigger_contribution
-       expected_count_for_cell <-  polygon_area * mean(lambda_at_probes)
-       expected_count_for_cell
   }
   
   toc()
@@ -238,19 +224,23 @@ if (compute_voronoi) {
   st_write(voronoi_polygons, paste0("results/voronoi_", experiment_id, ".shp"), delete_dsn = TRUE)
   
   # Plot the residuals on the map and the histogram
-  pdf(paste0("figures/", experiment_id, "_voronoi_residuals.pdf")) 
-  plot(voronoi_polygons["residuals"], )
-  dev.off()
+  p <- ggplot() +
+    geom_sf(data = voronoi_polygons, aes(fill = residuals)) +
+    labs(fill="Residuals") +
+    scale_fill_viridis_c("Residuals", direction = -1, option = "magma") +
+    theme_void()
+  ggsave(paste0("figures/", experiment_id, "_voronoi_residuals.pdf"),
+         plot = p, width = 1.0*A4_SHORT, height = 0.5*A4_LONG, unit="in")
   
-  pdf(paste0("figures/", experiment_id, "_voronoi_expected_gamma.pdf")) 
   p <- ggplot(voronoi_polygons) +
     geom_histogram(aes(x = residuals, y = ..density..),
                    binwidth = 0.1, fill = "grey", color = "black") +
     stat_function(aes(x = residuals, y = ..y..),
                   fun = function(x) dgamma(1-x, shape=3.569, scale = 1 / 3.569),
-                  n = 100, alpha=0.8, color = "red")
-  print(p)
-  dev.off()
+                  n = 100, alpha=0.8, color = "red") +
+    labs(x = "Residuals", y = "Density")
+  ggsave(paste0("figures/", experiment_id, "_voronoi_expected_gamma.pdf"),
+         plot = p, width = 0.5*A4_SHORT, height = 0.3*A4_LONG, unit="in")
   
   # Doing a statistical test for PIT values
   pit_values <- pgamma(1 - voronoi_polygons$residuals, shape = 3.569, scale = 1 / 3.569)
@@ -259,32 +249,30 @@ if (compute_voronoi) {
   ks_test_D_stat <- ks_test_result$statistic
   
   # Save the KS test results in the inference output
-  write(paste("PIT_KS", ks_test_D_stat, ks_test_p_val), 
+  write(paste("PIT_KS", ks_test_D_stat, ks_test_p_val),
         file = paste0("results/inferred_params", experiment_id, ".out"),
         append = TRUE)
 
-  pdf(paste0("figures/", experiment_id, "_voronoi_res_pit_test.pdf")) 
   p <- ggplot(data.frame(pit = pit_values)) +
     geom_histogram(aes(x = pit, y = ..density..),
                    binwidth = 0.05, fill = "grey", color = "black") +
     xlab("PIT values") + ylab("Density") +
-    labs(title = "Goodness-of-fit PIT test (Kolmogorov-Smirnov)", 
+    labs(title = "Goodness-of-fit PIT test (Kolmogorov-Smirnov)",
          subtitle = paste0("D-statistic=", format(ks_test_D_stat, digits = 3, nsmall = 3), "\n",
                            "p-value=", format(ks_test_p_val, digits = 3, nsmall = 3))) +
     geom_hline(yintercept = 1.0, color = "black", size = 1.5)
-  print(p)
-  dev.off()
+  ggsave(paste0("figures/", experiment_id, "_voronoi_res_pit_test.pdf"),
+         plot = p, width = 0.5*A4_SHORT, height = 0.3*A4_LONG, unit="in")
   
   # Q-Q plot with confidence bounds
-  pdf(paste0("figures/", experiment_id, "_voronoi_res_qq_plot.pdf")) 
   p <- ggplot(data = data.frame(vals = 1 - voronoi_polygons$residuals),
                mapping = aes(sample = vals)) +
     stat_qq_band(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569), bandType="boot") +
     stat_qq_line(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569)) +
     stat_qq_point(distribution = "gamma", dparams = list(shape=3.569, scale=1/3.569)) +
-    labs(x = "Theoretical Quantiles", y = "Sample Quantiles", 
+    labs(x = "Theoretical Quantiles", y = "Sample Quantiles",
          title = "Q-Q plot for Voronoi residuals",
          subtitle = "(bootstrap-based confidence bounds)")
-  print(p)
-  dev.off()
+  ggsave(paste0("figures/", experiment_id, "_voronoi_res_qq_plot.pdf"),
+         plot = p, width = 0.5*A4_SHORT, height = 0.3*A4_LONG, unit="in")
 }

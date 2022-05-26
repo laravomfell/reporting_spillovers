@@ -32,8 +32,6 @@
 
 # SETUP --------------------------------------------------------
 
-setwd("d:/research/hawkes")
-
 # range of area
 
 if (!is_real_data) {

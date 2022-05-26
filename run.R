@@ -34,8 +34,6 @@ library(fields)
 library(sf)
 library(data.table)
 library(optparse)
-# needed for plotting files that will not work on synthetic data
-# library(readxl)
 
 library(polyCub)
 library(mvtnorm)
@@ -77,6 +75,9 @@ label_10 <- function(...){
   function(x) label_parse()(gsub("e", "~x~10^", gsub("0e\\+00", "0", scientific_format()(x))))
 }
 
+A4_SHORT <- 8.25
+A4_LONG <- 11.75
+
 # set parameter precision
 tol <- 1e-5
 
@@ -109,24 +110,13 @@ default_end_date <- "2018-12-31"
 
 option_list = list(
   make_option("--real_data", action="store_true", default=FALSE),
-  make_option("--regenerate", action="store_true", default=FALSE),
   make_option("--snapshot", action="store_true", default=FALSE),
   make_option("--voronoi", action="store_true", default=FALSE),
   make_option("--g_delay", action="store_true", default=FALSE),
   make_option(c("-n", "--numsmooth"), type="integer", default=10, 
               help="Number of neighbours for background smoothing, [default= %default]", metavar="integer"),
-  make_option("--allevents", type="integer", default=2000,
-              help="Number of all events, [default= %default]", metavar="integer"),
-  make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
-              help="Start date.", metavar="character"),
-  make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
-              help="End date.", metavar="character"),
-  make_option("--follow_trig_prob", type="numeric", default=0.00,
-              help="Percentage of the triggered events that generate follow up events."),
-  make_option(c("-i", "--experimentid"), type="character", default="test_homogeneous",
+  make_option(c("-i", "--experimentid"), type="character", default="synthetic_good",
               help="Experiment name for easier identification of files and results.", metavar="character"),
-  make_option(c("--parents_proportion"), type="numeric", default=1.0,
-              help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events."),
   make_option("--bw_daily", type="numeric", default=1/24.0,
               help="Bandwidth [in days] for the daily component of the background."),
   make_option("--bw_weekly", type="numeric", default=8/24.0,
@@ -135,8 +125,22 @@ option_list = list(
               help="Bandwidth [in days] for the trend component of the background."),
   make_option("--bw_g", type="numeric", default=1.0,
               help="Bandwidth [in days] for the g(t) estimation."),
-  make_option("--bw_h", type="numeric", default=0.4,
-              help="Bandwidth [in km] for the h(s) estimation.")
+  make_option("--bw_h", type="numeric", default=0.1,
+              help="Bandwidth [in km] for the h(s) estimation."),
+  #
+  # Options below are there for synthetic experiemtns: real_data=FALSE
+  #
+  make_option("--regenerate", action="store_true", default=FALSE),
+  make_option("--allevents", type="integer", default=750,
+              help="Number of all events, [default= %default]", metavar="integer"),
+  make_option(c("-s", "--startdate"), type="character", default=default_start_date, 
+              help="Start date.", metavar="character"),
+  make_option(c("-e", "--enddate"), type="character", default=default_end_date, 
+              help="End date.", metavar="character"),
+  make_option("--follow_trig_prob", type="numeric", default=0.1,
+              help="Percentage of the triggered events that generate follow up events."),
+  make_option(c("--parents_proportion"), type="numeric", default=0.8,
+              help="Percentage of initial events that are considered as core. The remaining part of the initial events are triggered by a subset of core events.")
 );
 
 opt_parser = OptionParser(option_list=option_list);
@@ -246,10 +250,10 @@ if (!is_real_data) {
 
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
 
-# Running the model -----------------------------------------------------------
+# Running the model ------------------------------------------------------------
 source("2_model.R")
 
-# Plot raw data summaries -----------------------------------------------------------
+# Plot raw data summaries ------------------------------------------------------
 source("3_plot_data_summaries.R")
 
 # Plot model components -------------------------------------------------------
