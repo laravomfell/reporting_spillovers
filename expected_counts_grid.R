@@ -1,4 +1,3 @@
-library(sf)
 library(dplyr)
 library(lubridate)
 library(tidyr)
@@ -22,7 +21,7 @@ if (!file.exists("results/spatial_points_sf.rds")){
   
   
   spatial_points_sf <- st_as_sf(spatial_points_df, coords = c("x", "y"), 
-                                crs = 27700, agr = "constant") 
+                                crs = st_crs(shp), agr = "constant") 
   
   spatial_points_cell_labels_sf <-st_join(spatial_points_sf, region_gridded,
                                           join = st_intersects, largest=T, left = T)

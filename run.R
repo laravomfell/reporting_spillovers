@@ -271,4 +271,6 @@ source("plot_model_components.R")
 source("plot_model_fit.R")
 
 # Save expected counts according to the current model for a pre-defined space-time grid
-source("expected_counts_grid.R")
+if (is_real_data) {
+  source("expected_counts_grid.R")
+}

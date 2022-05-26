@@ -1,10 +1,8 @@
 background_smoothers/
 h_space_marks/
-org_background_smoothers/
-org_h_space_marks/
 poly.dll
 poly.o
-figures/synth_test*
+poly.so
 
 ### R ###
 # History files
