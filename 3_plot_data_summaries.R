@@ -1,5 +1,6 @@
-# In this file, we plot a time series of the event types and a spatial map of where the events are located
-
+# In this file, we plot a time series of the event types and a spatial map of 
+# where the events are located
+setDT(da)
 # drop time stamp
 da[, date_unif := as.Date(datetime_unif)]
 # turn e_type into a factor so the count operation below includes 0 counts
@@ -24,45 +25,10 @@ p <- ggplot(e_count,
                                override.aes = list(size = 1)))
 ggsave(paste0("figures/", experiment_id, "_time.pdf"), plot = p, width = 6.5, height = 3.5)
 
-# here, we would normally load our shapefile, instead we just take the square on which we generated the data
-
-# our plot also shows the underlying road network if you have a bbox and osmdata
-# I uncommented these steps here
-
-# # get streets
-# street_values <- c("motorway",
-#                    "trunk",
-#                    "primary", "secondary", "tertiary")
-# street_values <- c(street_values, paste0(street_values, "_link"),
-#                    "unclassified", "residential", "living_street", "pedestrian")
-#   
-#   
-# osm_bbox <- st_bbox(st_transform(st_as_sfc(bbox * 1000), 4326))
-# # define query for all roads
-# roads <- opq(bbox = osm_bbox, timeout = 50) %>%
-#   add_osm_feature(key = "highway", value = street_values) %>%
-#   osmdata_sf()
-# roads <- roads$osm_lines
-# 
-# # keep only the lines inside shp
-# roads <- st_transform(roads, crs = 27700)
-# roads <- st_intersection(roads, shp)
-# 
-# # define line thinkness for streets
-# roads$lw <- dplyr::case_when(roads$highway %in% c("residential", 
-#                                                   "unclassified", 
-#                                                   "tertiary", 
-#                                                   "tertiary_link", 
-#                                                   "living_street") ~ "B",
-#                              roads$highway == "pedestrian" ~ "C",
-#                              TRUE ~ "A")
-# 
-# roads <- subset(roads, select = c("osm_id", "name", "highway", "lw"))
-
+# here, we would normally load our shapefile, instead we just take the domain on 
+# which we generated the data
 
 p <- ggplot() +
-  # geom_sf(data = roads, aes(size = lw), inherit.aes = F, color = "#4c4c4c") +
-  # scale_size_manual(values = c("A" = .65, "B" = .55, "C" = .3), guide = FALSE) +
   geom_sf(data = shp, fill = "transparent") +
   geom_point(data = da, aes(coorx, coory, color = days), alpha = 0.4) +
   scale_color_gradient2(high = "#8a3000", low = "#f5b999", mid = "#e65100", midpoint = 181,

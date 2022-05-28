@@ -104,26 +104,7 @@ ggsave(paste0("figures/", experiment_id, "_gt.pdf"), plot = p, width = 4.5, heig
 # b) h(s)
 h_s <- cbind(expand.grid(x = h_base_x * 1000, y = h_base_y * 1000),
              z = as.vector(h_basevalue))
-## cont_label <- data.frame(x = -10, 
-##                          y = c(-315, -252, -192,-125, 0), 
-##                          b = seq(0.12, 0.16, by = 0.01),
-##                          label = c(seq(0.12, 0.15, by = 0.01), ""))
 
-## p <- ggplot(h_s[h_s$z >= 0.1,], aes(x,y,z = z)) + 
-##   geom_contour(color = "black", breaks = cont_label$b) +
-##   labs(x = "Distance in X (in m)", y = "Distance in Y (in m)") + 
-##   coord_fixed(xlim = c(-500, 350), ylim = c(-400, 400)) + 
-##   # hacky solution to overplot white on the black circles
-##   geom_label(data = cont_label, aes(x,y,label = label), 
-##              inherit.aes = F, 
-##              color = "white", 
-##              label.padding = unit(0.15, "lines"),
-##              size = 2.75) + 
-##   # plot text on top
-##   geom_text(data = cont_label, aes(x, y, label = label), inherit.aes = F, size = 2.75) + 
-##   geom_point(data = data.frame(x = 0, y = 0, z = 0), color = "#4c4c4c", shape = 3)
-
-# This is temporary for the experimentation stage.
 p <- ggplot(h_s, aes(x, y, z= z, colour=stat(level))) +
     labs(x = "Distance in X (in m)", y = "Distance in Y (in m)") + 
     geom_contour() +

@@ -1,4 +1,4 @@
-# In this file, we perform the model check shown in figure 2.4
+# In this file, we perform the model checks shown in Section 5.3
 
 bg_at_all_locations <- trend_fun(time_marks) * 
   weekly_fun(time_marks) * 
@@ -8,7 +8,8 @@ bg_at_all_locations <- trend_fun(time_marks) *
   ra * bg_weight
 
 
-trigger_at_all_locations <- foreach(i = 1:nrow(da)) %dopar% trigger_at_all_fun(a = da, i = i, constants = bg_weight * ra)
+trigger_at_all_locations <- foreach(i = 1:nrow(da)) %dopar% 
+  trigger_at_all_fun(a = da, i = i, constants = bg_weight * ra)
 # reduce by event type
 trigger_at_all_locations <- map(event_types, function(x) reduce(trigger_at_all_locations[da$e_type == x],
                                                                 `+`))
@@ -55,8 +56,6 @@ p <- ggplot(fit,
                               y = c(0, n_events)),
             color = "black") +
   geom_line(color = "#721F81FF", size = .8) + 
-  #scale_x_continuous(breaks = c(0, 2000, 4000, n_events)) + 
-  #scale_y_continuous(breaks = c(0, 2000, 4000, n_events)) +
   coord_fixed(xlim = c(0, max(fit$x)), ylim = c(0, n_events))+
   theme(panel.grid = element_blank(),
         axis.text = element_text(size = 9)) +
@@ -81,11 +80,8 @@ p <- ggplot(fit, aes(y, dev)) +
 ggsave(paste0("figures/", experiment_id, "_dev.pdf"), plot = p, width = 5.5, height = 3.5)
 
 
-##
-##
 ## Voronoi diagnostics
-##
-##
+
 if (compute_voronoi) {
   voronoi_num_samples <- 50
   initial_events_sf <- st_as_sf(da[da$e_type == 0,], coords = c("coorx", "coory"))

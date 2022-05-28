@@ -3,7 +3,7 @@
 # by Lara Vomfell and Jan Povala.
 
 # Author: Lara Vomfell
-# Date: 11/02/2021
+# Date: 27/04/2021
 
 # The original underlying the project cannot be shared. Also, we cannot identify
 # the location of the police force who provided us with the data.
@@ -204,19 +204,19 @@ if (file.exists(gen_data_fname) & !regen_data) {
 } else {
   print("Regenerating synthetic data.")
   library(stpp)
-  source("generate_synthetic_data.R")
+  source("1_generate_synthetic_data.R")
 }
 
 print(paste0(">>>>>> EXPERIMENT ID: ", experiment_id))
 
 # Running the model ------------------------------------------------------------
-source("model.R")
+source("2_model.R")
 
 # Plot raw data summaries ------------------------------------------------------
-source("plot_data_summaries.R")
+source("3_plot_data_summaries.R")
 
 # Plot model components -------------------------------------------------------
-source("plot_model_components.R")
+source("4_plot_model_components.R")
 
 # Plot model fit --------------------------------------------------------------
-source("plot_model_fit.R")
+source("5_plot_model_fit.R")
